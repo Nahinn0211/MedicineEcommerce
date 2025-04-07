@@ -9,6 +9,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -87,9 +88,17 @@ public class User extends BaseEntity {
     private DoctorProfile doctorProfile;
 
     public Set<Role> getRoles() {
-        return userRoles.stream()
-                .map(UserRole::getRole)
-                .collect(Collectors.toSet());
+        if (userRoles == null) {
+            return Collections.emptySet();
+        }
+
+        Set<Role> roles = new HashSet<>();
+        for (UserRole userRole : userRoles) {
+            if (userRole.getRole() != null) {
+                roles.add(userRole.getRole());
+            }
+        }
+        return roles;
     }
 
     public Collection<? extends GrantedAuthority> getAuthorities() {

@@ -12,12 +12,12 @@ import hunre.edu.vn.backend.repository.PatientProfileRepository;
 import hunre.edu.vn.backend.service.AppointmentService;
 import org.springframework.stereotype.Service;
 
+import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -182,5 +182,20 @@ public class AppointmentServiceImpl implements AppointmentService {
                 .weeklyStats(weeklyStats)
                 .monthlyStats(monthlyStats)
                 .build();
+    }
+
+    @Override
+    public Boolean checkAvailabilityForDoctor(Long doctorId, LocalDate date, LocalTime time) {
+        List<Appointment> appointments = appointmentRepository.findByDoctorIdAndAppointmentDate(doctorId, date);
+        return appointments.stream()
+                .noneMatch(app -> app.getAppointmentTime().equals(time));
+    }
+
+    @Override
+    public List<String> getDoctorBookedSlots(Long doctorId, LocalDate date) {
+        List<LocalTime> bookedTimeSlots = appointmentRepository.findBookedTimeSlots(doctorId, date);
+        return bookedTimeSlots.stream()
+                .map(time -> time.format(DateTimeFormatter.ofPattern("HH:mm")))
+                .collect(Collectors.toList());
     }
 }

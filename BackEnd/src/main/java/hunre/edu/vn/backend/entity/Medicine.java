@@ -57,17 +57,17 @@ public class Medicine extends BaseEntity {
     @Formula("(SELECT MAX(a.price_out) FROM attributes a WHERE a.medicine_id = id AND a.is_deleted = false)")
     private BigDecimal maxPrice;
 
-    @OneToMany(mappedBy = "medicine", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "medicine", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @ToString.Exclude
     @Builder.Default
     private List<Attribute> attributes = new ArrayList<>();
 
-    @OneToMany(mappedBy = "medicine", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "medicine", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @ToString.Exclude
     @Builder.Default
     private List<MedicineCategory> medicineCategories = new ArrayList<>();
 
-    @OneToMany(mappedBy = "medicine", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "medicine", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @ToString.Exclude
     @Builder.Default
     private List<MedicineMedia> medicineMedias = new ArrayList<>();

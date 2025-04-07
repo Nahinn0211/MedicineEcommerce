@@ -2,7 +2,10 @@ package hunre.edu.vn.backend.service;
 
 import hunre.edu.vn.backend.dto.AppointmentDTO;
 
+import java.sql.Time;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,4 +25,6 @@ public interface AppointmentService {
     Map<LocalDate, Long> getWeeklyStats(LocalDate startDate, LocalDate endDate);
     Map<Integer, Long> getMonthlyStats(int year);
     AppointmentDTO.AppointmentStatsDTO getDashboardStats();
+    Boolean checkAvailabilityForDoctor(Long doctorId, LocalDate date, LocalTime time);
+    List<String> getDoctorBookedSlots(Long doctorId, LocalDate date);
 }

@@ -124,6 +124,11 @@ public class ServiceBookingController {
         return ResponseEntity.ok(bookings);
     }
 
+    @PostMapping("/cancel/{id}")
+    public String cancelServiceBooking(@PathVariable Long id) {
+        return serviceBookingService.cancelServiceBooking(id);
+    }
+
     private List<ServiceBookingDTO.DetailedServiceBookingDto> findDoctorBookings(Long doctorProfileId) {
         throw new UnsupportedOperationException("Chưa triển khai tìm kiếm đặt dịch vụ theo ID bác sĩ");
     }

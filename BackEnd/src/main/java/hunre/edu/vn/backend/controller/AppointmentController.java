@@ -18,6 +18,7 @@ import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -123,7 +124,18 @@ public class AppointmentController {
         return ResponseEntity.ok(stats);
     }
 
+    @GetMapping("/check-availability")
+    public Boolean checkAvailability(@RequestParam Long doctorId, @RequestParam LocalDate date, @RequestParam LocalTime timeSlot) {
+        return appointmentService.checkAvailabilityForDoctor(doctorId, date, timeSlot);
+    }
 
+    @GetMapping("/booked-slots")
+    public List<String> getBookedSlots(
+            @RequestParam Long doctorId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        return appointmentService.getDoctorBookedSlots(doctorId, date);
+    }
 
     @GetMapping("/doctor/me")
     public ResponseEntity<?> getCurrentDoctorAppointments() {

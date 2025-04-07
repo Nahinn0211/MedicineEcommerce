@@ -19,4 +19,5 @@ public interface OrderService {
     Optional<OrderDTO.OrderFullDetailDto> findLatestOrderFullDetailByUserId(Long userId);
     BigDecimal getTotalRevenue();
     Long getTotalOrders();
+    String cancelOrder(Long id, String reason);
 }

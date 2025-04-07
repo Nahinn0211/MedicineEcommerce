@@ -75,6 +75,11 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
+    @PostMapping("/cancel")
+    public String cancelOrder(@RequestParam Long orderId, @RequestParam String reason) {
+        return orderService.cancelOrder(orderId, reason);
+    }
+
     @GetMapping("/by-status/{status}")
     public ResponseEntity<List<OrderDTO.GetOrderDTO>> getOrdersByStatus(@PathVariable OrderStatus status) {
         List<OrderDTO.GetOrderDTO> orders = orderService.findByStatus(status);

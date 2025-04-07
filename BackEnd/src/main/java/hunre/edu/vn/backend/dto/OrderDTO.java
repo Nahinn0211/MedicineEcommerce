@@ -31,17 +31,12 @@ public class OrderDTO {
         private PatientProfileDTO.GetPatientProfileDTO patient;
         private String patientName;
         private BigDecimal totalPrice;
-        private BigDecimal subTotal;
         private PaymentMethod paymentMethod;
         private OrderStatus status;
         private PaymentStatus paymentStatus;
         private String voucherCode;
         private BigDecimal discountAmount;
         private String note;
-        private String shippingAddress;
-        private String shippingPhone;
-        private String shippingName;
-        private BigDecimal shippingFee;
         private LocalDateTime completedAt;
         private LocalDateTime cancelledAt;
         private String cancelledReason;
@@ -70,11 +65,6 @@ public class OrderDTO {
         private String voucherCode;
         private BigDecimal discountAmount;
         private String note;
-        private String shippingAddress;
-        private String shippingPhone;
-        private String shippingName;
-        private BigDecimal shippingFee;
-        private String cancelledReason;
         private BigDecimal totalPrice;
     }
 
@@ -89,17 +79,12 @@ public class OrderDTO {
                 .orderCode(order.getOrderCode())
                 .patient(PatientProfileDTO.fromEntity(order.getPatient()))
                 .totalPrice(order.getTotalPrice())
-                .subTotal(order.getSubTotal())
                 .paymentMethod(order.getPaymentMethod())
                 .status(order.getStatus())
                 .paymentStatus(order.getPaymentStatus())
                 .voucherCode(order.getVoucherCode())
                 .discountAmount(order.getDiscountAmount())
                 .note(order.getNote())
-                .shippingAddress(order.getShippingAddress())
-                .shippingPhone(order.getShippingPhone())
-                .shippingName(order.getShippingName())
-                .shippingFee(order.getShippingFee())
                 .completedAt(order.getCompletedAt())
                 .cancelledAt(order.getCancelledAt())
                 .cancelledReason(order.getCancelledReason())

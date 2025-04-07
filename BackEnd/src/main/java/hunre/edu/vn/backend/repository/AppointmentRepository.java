@@ -6,6 +6,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +34,11 @@ public interface AppointmentRepository extends BaseRepository<Appointment> {
     @Query("SELECT COUNT(a) FROM Appointment a WHERE a.appointmentDate = :date AND a.isDeleted = false")
     Long countByDate(@Param("date") LocalDate date);
 
+    @Query("SELECT a.appointmentTime FROM Appointment a WHERE a.doctor.id = :doctorId AND a.appointmentDate = :appointmentDate AND a.isDeleted = false")
+    List<LocalTime> findBookedTimeSlots(
+            @Param("doctorId") Long doctorId,
+            @Param("appointmentDate") LocalDate date
+    );
     // Thống kê lịch hẹn theo tuần
     @Query("SELECT a.appointmentDate, COUNT(a) FROM Appointment a " +
             "WHERE a.appointmentDate BETWEEN :startDate AND :endDate AND a.isDeleted = false " +
@@ -40,6 +47,8 @@ public interface AppointmentRepository extends BaseRepository<Appointment> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+    @Query("SELECT a FROM Appointment a WHERE a.isDeleted = false AND a.appointmentDate = :appointmentDate AND a.doctor.id = :doctorId")
+    List<Appointment> findByDoctorIdAndAppointmentDate(Long doctorId, LocalDate appointmentDate);
 
     // Thống kê lịch hẹn theo tháng
     @Query("SELECT FUNCTION('MONTH', a.appointmentDate), COUNT(a) FROM Appointment a " +

@@ -23,7 +23,6 @@ public class RoleDTO {
     public static class GetRoleDTO {
         private Long id;
         private String name;
-        private Set<UserRoleDTO.GetUserRoleDTO> userRoles;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
     }
@@ -58,10 +57,10 @@ public class RoleDTO {
         return GetRoleDTO.builder()
                 .id(role.getId())
                 .name(role.getName())
-                .userRoles(role.getUserRoles() != null ?
-                        role.getUserRoles().stream()
-                                .map(UserRoleDTO::fromEntity)
-                                .collect(Collectors.toSet()) : null)
+//                .userRoles(role.getUserRoles() != null ?
+//                        role.getUserRoles().stream()
+//                                .map(UserRoleDTO::fromEntity)
+//                                .collect(Collectors.toSet()) : null)
                 .createdAt(role.getCreatedAt())
                 .updatedAt(role.getUpdatedAt())
                 .build();

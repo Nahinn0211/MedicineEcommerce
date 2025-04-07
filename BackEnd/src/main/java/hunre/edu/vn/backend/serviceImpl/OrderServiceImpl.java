@@ -5,12 +5,12 @@ import hunre.edu.vn.backend.dto.OrderDetailDTO;
 import hunre.edu.vn.backend.entity.*;
 import hunre.edu.vn.backend.mapper.OrderDetailMapper;
 import hunre.edu.vn.backend.mapper.OrderMapper;
-import hunre.edu.vn.backend.repository.MedicineRepository;
-import hunre.edu.vn.backend.repository.OrderRepository;
-import hunre.edu.vn.backend.repository.PatientProfileRepository;
-import hunre.edu.vn.backend.repository.UserRepository;
+import hunre.edu.vn.backend.repository.*;
+import hunre.edu.vn.backend.service.EmailService;
 import hunre.edu.vn.backend.service.OrderService;
+import jakarta.mail.MessagingException;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,17 +31,22 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final OrderDetailMapper orderDetailMapper;
     private final MedicineRepository medicineRepository;
+    private final VoucherRepository voucherRepository;
+    private final EmailService emailService;
+
 
     public OrderServiceImpl(
             OrderRepository orderRepository,
             PatientProfileRepository patientRepository,
-            OrderMapper orderMapper, UserRepository userRepository, OrderDetailMapper orderDetailMapper, MedicineRepository medicineRepository) {
+            OrderMapper orderMapper, UserRepository userRepository, OrderDetailMapper orderDetailMapper, MedicineRepository medicineRepository, VoucherRepository voucherRepository, VoucherRepository voucherRepository1, EmailService emailService) {
         this.orderRepository = orderRepository;
         this.patientRepository = patientRepository;
         this.orderMapper = orderMapper;
         this.userRepository = userRepository;
         this.orderDetailMapper = orderDetailMapper;
         this.medicineRepository = medicineRepository;
+        this.voucherRepository = voucherRepository1;
+        this.emailService = emailService;
     }
     @Override
     public BigDecimal getTotalRevenue() {
@@ -118,7 +124,12 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new RuntimeException("Patient not found with ID: " + orderDTO.getPatientId()));
             order.setPatient(patient);
         }
-
+        if (orderDTO.getOrderCode() != null) {
+            Voucher voucher = voucherRepository.findByCodeAndIsDeletedFalse(orderDTO.getVoucherCode())
+                    .orElseThrow(() -> new RuntimeException("Voucher not found with code: " + orderDTO.getVoucherCode()));
+            voucher.setStock(voucher.getStock() - 1);
+            voucherRepository.save(voucher);
+        }
         // Cập nhật các trường khác
         order.setTotalPrice(orderDTO.getTotalPrice());
         order.setPaymentMethod(orderDTO.getPaymentMethod());
@@ -126,8 +137,47 @@ public class OrderServiceImpl implements OrderService {
         order.setVoucherCode(orderDTO.getVoucherCode());
         order.setDiscountAmount(orderDTO.getDiscountAmount());
         order.setNote(orderDTO.getNote());
+        if (orderDTO.getPaymentMethod() == PaymentMethod.CASH){
+            order.setPaymentStatus(PaymentStatus.PENDING);
+        }else{
+            order.setPaymentStatus(PaymentStatus.COMPLETED);
+        }
 
         Order savedOrder = orderRepository.save(order);
+
+        final Long orderId = savedOrder.getId();
+        final String userEmail = savedOrder.getPatient().getUser().getEmail();
+        final String userName = savedOrder.getPatient().getUser().getFullName();
+        CompletableFuture.runAsync(() -> {
+            try {
+                // Thử tối đa 3 lần để lấy chi tiết đơn hàng
+                for (int attempt = 1; attempt <= 3; attempt++) {
+                    // Chờ giữa các lần thử (5s, 10s, 15s)
+                    Thread.sleep(attempt * 5000);
+
+                    // Tải lại đơn hàng từ database
+                    Order refreshedOrder = orderRepository.findById(orderId)
+                            .orElseThrow(() -> new RuntimeException("Order not found"));
+
+                    // Kiểm tra xem đơn hàng đã có chi tiết chưa
+                    if (refreshedOrder.getOrderDetails() != null && !refreshedOrder.getOrderDetails().isEmpty()) {
+                        User user = refreshedOrder.getPatient().getUser();
+                        emailService.sendOrderConfirmationEmail(orderId, userEmail, userName);
+
+                        // Log thành công và thoát khỏi vòng lặp
+                        System.out.println("Email xác nhận đã được gửi sau " + attempt + " lần thử, với "
+                                + refreshedOrder.getOrderDetails().size() + " chi tiết đơn hàng");
+                        return;
+                    }
+
+                    System.out.println("Lần thử " + attempt + ": Đơn hàng vẫn chưa có chi tiết, đợi thêm...");
+                }
+            } catch (Exception e) {
+                System.out.println("Lỗi khi gửi email xác nhận đơn hàng: " + e);
+                e.printStackTrace();
+            }
+        });
+
         return orderMapper.toGetOrderDTO(savedOrder);
     }
 
@@ -154,6 +204,17 @@ public class OrderServiceImpl implements OrderService {
                 .stream()
                 .map(orderMapper::toGetOrderDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public String cancelOrder(Long id, String reason) {
+        Optional<Order> orderOptional = orderRepository.findById(id);
+        if (orderOptional.isPresent()) {
+            Order order = orderOptional.get();
+            order.cancel(reason);
+            orderRepository.save(order);
+        }
+        return "Đã hủy đơn thành công";
     }
 
     @Override

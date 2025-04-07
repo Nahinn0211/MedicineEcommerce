@@ -16,10 +16,10 @@ public interface ServiceBookingService {
     List<ServiceBookingDTO.GetServiceBookingDTO> findByPatientId(Long patientId);
     List<ServiceBookingDTO.GetServiceBookingDTO> findByStatus(BookingStatus status);
     List<ServiceBookingDTO.DetailedServiceBookingDto> findByDoctorProfileIdWithDetails(Long doctorProfileId);
-
     List<ServiceBookingDTO.DetailedServiceBookingDto> findAllWithDetails();
     Optional<ServiceBookingDTO.DetailedServiceBookingDto> findByIdWithDetails(Long id);
     List<ServiceBookingDTO.DetailedServiceBookingDto> findByServiceIdWithDetails(Long serviceId);
     List<ServiceBookingDTO.DetailedServiceBookingDto> findByPatientIdWithDetails(Long patientId);
     List<ServiceBookingDTO.DetailedServiceBookingDto> findByStatusWithDetails(BookingStatus status);
+    String cancelServiceBooking(Long id);
 }

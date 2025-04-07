@@ -16,7 +16,7 @@ import java.util.Optional;
 @Repository
 public interface ConsultationRepository extends BaseRepository<Consultation> {
     @Query("SELECT c FROM Consultation as c WHERE c.consultationCode = :code AND c.isDeleted = false")
-    boolean existsByConsultationCode(String code);
+    Boolean existsByConsultationCode(String code);
     @Query("SELECT c FROM Consultation as c WHERE c.patient.id = :patientId AND c.isDeleted = false")
     List<Consultation> findByPatientId(Long patientId);
     @Query("SELECT c FROM Consultation as c WHERE c.appointment.id = :appointmentId AND c.isDeleted = false")

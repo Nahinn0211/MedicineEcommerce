@@ -1,5 +1,6 @@
 package hunre.edu.vn.backend.dto;
 
+import hunre.edu.vn.backend.entity.DoctorService;
 import hunre.edu.vn.backend.entity.Service;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
@@ -7,6 +8,7 @@ import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @SuperBuilder
@@ -25,6 +27,7 @@ public class ServiceDTO{
         private String image;
         private BigDecimal price;
         private String description;
+        private DoctorProfileDTO.GetDoctorProfileDTO doctorProfile;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
     }
@@ -52,12 +55,21 @@ public class ServiceDTO{
     public static GetServiceDTO fromEntity(Service service) {
         if (service == null) return null;
 
+        List<DoctorService> doctorServices = service.getDoctorServices();
+
+        // Lấy DoctorProfile đầu tiên (nếu có)
+        DoctorProfileDTO.GetDoctorProfileDTO doctorProfileDTO = null;
+        if (doctorServices != null && !doctorServices.isEmpty()) {
+            doctorProfileDTO = DoctorProfileDTO.fromEntity(doctorServices.get(0).getDoctor());
+        }
+
         return GetServiceDTO.builder()
                 .id(service.getId())
                 .name(service.getName())
                 .image(service.getImage())
                 .price(service.getPrice())
                 .description(service.getDescription())
+                .doctorProfile(doctorProfileDTO)
                 .createdAt(service.getCreatedAt())
                 .updatedAt(service.getUpdatedAt())
                 .build();
