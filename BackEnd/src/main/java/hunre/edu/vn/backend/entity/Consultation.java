@@ -44,7 +44,7 @@ public class Consultation extends BaseEntity {
     private Appointment appointment;
 
     @NotBlank(message = "Mã tư vấn không được để trống")
-    @Pattern(regexp = "^CONS-\\d{6}$", message = "Mã tư vấn phải có định dạng CONS-XXXXXX")
+    @Pattern(regexp = "^[A-Z0-9]{8}$", message = "Mã tư vấn phải có 8 ký tự chữ hoa hoặc số")
     @Column(name = "consultation_code", unique = true)
     private String consultationCode;
 

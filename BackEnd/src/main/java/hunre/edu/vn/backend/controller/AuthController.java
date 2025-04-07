@@ -1,6 +1,7 @@
 package hunre.edu.vn.backend.controller;
 
 import hunre.edu.vn.backend.dto.UserDTO;
+import hunre.edu.vn.backend.exception.ResourceNotFoundException;
 import hunre.edu.vn.backend.payload.LoginRequest;
 import hunre.edu.vn.backend.payload.SocialLoginRequest;
 import hunre.edu.vn.backend.service.UserService;
@@ -115,6 +116,54 @@ public class AuthController {
                         grantedAuthority.getAuthority().equalsIgnoreCase("ROLE_" + roleName));
 
         return ResponseEntity.ok(Collections.singletonMap("hasRole", hasRole));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Yêu cầu đặt lại mật khẩu", description = "Tạo token đặt lại mật khẩu")
+    public ResponseEntity<Map<String, String>> forgotPassword(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        try {
+            String resetToken = userService.generatePasswordResetToken(email);
+            return ResponseEntity.ok(
+                    Collections.singletonMap("message", "Đã gửi email đặt lại mật khẩu")
+            );
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Collections.singletonMap("error", "Không tìm thấy tài khoản"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Không thể gửi email đặt lại mật khẩu"));
+        }
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Đặt lại mật khẩu", description = "Xác nhận token và cập nhật mật khẩu mới")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody Map<String, String> payload) {
+        String token = payload.get("token");
+        String newPassword = payload.get("newPassword");
+
+        System.out.println("token: " + token + " newPassword: " + newPassword);
+
+        try {
+            // Kiểm tra token hợp lệ
+            if (!userService.validatePasswordResetToken(token)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Collections.singletonMap("error", "Token không hợp lệ hoặc đã hết hạn"));
+            }
+
+            // Đặt lại mật khẩu
+            userService.resetPassword(token, newPassword);
+
+            return ResponseEntity.ok(
+                    Collections.singletonMap("message", "Đặt lại mật khẩu thành công")
+            );
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Collections.singletonMap("error", "Không tìm thấy tài khoản"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Không thể đặt lại mật khẩu"));
+        }
     }
 
     // Lớp nội để trả về thông tin người dùng

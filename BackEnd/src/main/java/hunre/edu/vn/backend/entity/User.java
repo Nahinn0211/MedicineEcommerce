@@ -6,6 +6,7 @@ import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -68,6 +69,10 @@ public class User extends BaseEntity {
 
     @Column(name = "reset_password_token", nullable = true)
     private String resetPasswordToken;
+
+    @Getter
+    @Column(name = "reset_password_expiry", nullable = true)
+    private LocalDateTime resetPasswordExpiry;
 
     @Builder.Default
     @ToString.Exclude
@@ -145,5 +150,4 @@ public class User extends BaseEntity {
     public void updateLastLogin() {
         this.lastLogin = LocalDateTime.now();
     }
-
 }

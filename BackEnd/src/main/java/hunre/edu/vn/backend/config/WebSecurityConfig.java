@@ -64,8 +64,11 @@ public class WebSecurityConfig {
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/profile/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/appointments/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/patient-profiles/**").permitAll()
-                            .requestMatchers(org.springframework.http.HttpMethod.GET, "/ws-consultation/**").permitAll()
+                            .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/consultations/**").permitAll()
                             .requestMatchers("/api/auth/login").permitAll()
+                            .requestMatchers( "/ws-consultation/**").authenticated()
+                            .requestMatchers("/api/auth/forgot-password").permitAll()
+                            .requestMatchers("/api/auth/reset-password").permitAll()
                             .requestMatchers("/api/auth/register").permitAll()
                             .requestMatchers("/api/auth/login/facebook").permitAll()
                             .requestMatchers("/api/auth/login/google").permitAll()
@@ -73,6 +76,7 @@ public class WebSecurityConfig {
                             .requestMatchers("/swagger-ui/**").permitAll()
                             .requestMatchers("/swagger-resources/**").permitAll()
                             .requestMatchers("/webjars/**").permitAll()
+
                             .anyRequest().authenticated();
 
                     // Thêm log để debug

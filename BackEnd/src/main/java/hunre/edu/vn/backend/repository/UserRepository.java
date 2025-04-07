@@ -22,4 +22,6 @@ public interface UserRepository extends BaseRepository<User> {
     List<User> findByEnabled(Boolean enabled);
     @Query("SELECT u FROM User as u WHERE u.enabled = false AND u.isDeleted = false")
     List<User> findByLocked(Boolean locked);
+    @Query("SELECT u FROM User as u WHERE u.resetPasswordToken = :token AND u.isDeleted = false")
+    Optional<User> findByResetPasswordToken(String token);
 }

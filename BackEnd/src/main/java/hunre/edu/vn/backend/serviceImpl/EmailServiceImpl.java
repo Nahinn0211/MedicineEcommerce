@@ -54,6 +54,7 @@ import javax.imageio.ImageIO;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.text.NumberFormat;
@@ -474,64 +475,187 @@ public class EmailServiceImpl implements EmailService {
     /**
      * Tạo PDF xác nhận đặt dịch vụ
      */
+    /**
+     * Tạo PDF xác nhận đặt dịch vụ
+     */
     private byte[] generateServiceBookingPdf(ServiceBooking serviceBooking) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-        PdfWriter writer = new PdfWriter(baos);
-        PdfDocument pdf = new PdfDocument(writer);
-        Document document = new Document(pdf, PageSize.A4);
+        try (PdfWriter writer = new PdfWriter(baos);
+             PdfDocument pdf = new PdfDocument(writer);
+             Document document = new Document(pdf, PageSize.A4)) {
 
-        try {
-            // Sử dụng font cơ bản - tránh lỗi Identity-H
-            PdfFont regularFont = PdfFontFactory.createFont("fonts/Unicode/arial.ttf");
-            PdfFont boldFont = PdfFontFactory.createFont("fonts/Unicode/arialbd.ttf");
+            logger.info("Bắt đầu tạo PDF cho đặt dịch vụ ID: {}", serviceBooking.getId());
 
-            // Thêm QR code cho mã dịch vụ
-            addQRCode(document, "SERVICE:" + serviceBooking.getId().toString());
+            // Sử dụng font hỗ trợ tiếng Việt hoặc font mặc định nếu không tìm thấy
+            PdfFont regularFont, boldFont;
+            try {
+                regularFont = PdfFontFactory.createFont("fonts/Unicode/arial.ttf");
+                boldFont = PdfFontFactory.createFont("fonts/Unicode/arialbd.ttf");
+                logger.debug("Đã tải font tùy chỉnh thành công");
+            } catch (IOException e) {
+                logger.warn("Không thể tải font tùy chỉnh, sử dụng font mặc định: {}", e.getMessage());
+                regularFont = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+                boldFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+            }
+
+            // Thêm logo nếu có
+            try {
+                if (COMPANY_LOGO_URL != null && !COMPANY_LOGO_URL.isEmpty()) {
+                    ImageData imageData = ImageDataFactory.create(new URL(COMPANY_LOGO_URL));
+                    Image logo = new Image(imageData).setWidth(50).setHeight(50);
+                    document.add(logo);
+                    logger.debug("Đã thêm logo công ty");
+                }
+            } catch (Exception e) {
+                logger.warn("Không thể thêm logo công ty: {}", e.getMessage());
+            }
 
             // Thêm thông tin công ty
-            addCompanyHeader(document, boldFont, regularFont);
+            document.add(new Paragraph(COMPANY_NAME)
+                    .setFont(boldFont)
+                    .setTextAlignment(TextAlignment.LEFT)
+                    .setFontSize(12));
+            document.add(new Paragraph(COMPANY_ADDRESS)
+                    .setFont(regularFont)
+                    .setTextAlignment(TextAlignment.LEFT)
+                    .setFontSize(10)
+                    .setMarginBottom(10));
 
-            // Tiêu đề
+            // Thêm tiêu đề
             document.add(new Paragraph("XÁC NHẬN DỊCH VỤ")
                     .setFont(boldFont)
+                    .setFontSize(18)
                     .setTextAlignment(TextAlignment.CENTER)
-                    .setFontSize(16)
-                    .setMarginTop(20)
                     .setMarginBottom(20));
 
             // Thông tin khách hàng
             User user = serviceBooking.getPatient().getUser();
-            addCustomerInfo(document, user.getFullName(), user.getEmail(), regularFont);
+            document.add(new Paragraph("Khách hàng: " + user.getFullName())
+                    .setFont(regularFont)
+                    .setFontSize(12));
+            document.add(new Paragraph("Email: " + user.getEmail())
+                    .setFont(regularFont)
+                    .setFontSize(12)
+                    .setMarginBottom(10));
 
             // Thông tin dịch vụ
-            addServiceInfo(document, serviceBooking, regularFont);
+            document.add(new Paragraph("Mã đặt dịch vụ: " + serviceBooking.getId())
+                    .setFont(regularFont)
+                    .setFontSize(12));
+            document.add(new Paragraph("Dịch vụ: " +
+                    (serviceBooking.getService() != null ? serviceBooking.getService().getName() : "N/A"))
+                    .setFont(regularFont)
+                    .setFontSize(12));
+            document.add(new Paragraph("Bác sĩ: " +
+                    (serviceBooking.getDoctor() != null && serviceBooking.getDoctor().getUser() != null ?
+                            serviceBooking.getDoctor().getUser().getFullName() : "N/A"))
+                    .setFont(regularFont)
+                    .setFontSize(12));
+            document.add(new Paragraph("Ngày đặt: " + formatDateTime(serviceBooking.getCreatedAt()))
+                    .setFont(regularFont)
+                    .setFontSize(12));
 
-            // Chi tiết dịch vụ
-            Table serviceTable = createServiceDetailsTable(serviceBooking, boldFont, regularFont);
-            document.add(serviceTable);
+            if (serviceBooking.getAppointment() != null) {
+                document.add(new Paragraph("Ngày hẹn: " + serviceBooking.getAppointment().getAppointmentDate())
+                        .setFont(regularFont)
+                        .setFontSize(12));
+                document.add(new Paragraph("Giờ hẹn: " + serviceBooking.getAppointment().getAppointmentTime())
+                        .setFont(regularFont)
+                        .setFontSize(12));
+            }
 
-            // Tổng thanh toán
-            document.add(new Paragraph("Tổng thanh toán: " + formatCurrency(serviceBooking.getTotalPrice()))
+            document.add(new Paragraph("Phương thức thanh toán: " +
+                    getPaymentMethodName(serviceBooking.getPaymentMethod().toString()))
+                    .setFont(regularFont)
+                    .setFontSize(12));
+            document.add(new Paragraph("Trạng thái: " +
+                    getServiceBookingStatusName(serviceBooking.getStatus().toString()))
+                    .setFont(regularFont)
+                    .setFontSize(12)
+                    .setMarginBottom(20));
+
+            // Tạo bảng chi tiết dịch vụ
+            float[] columnWidths = {3, 1, 2};
+            Table table = new Table(columnWidths).useAllAvailableWidth();
+
+            // Tiêu đề cột
+            String[] headers = {"Dịch vụ", "Số lượng", "Thành tiền"};
+            for (String header : headers) {
+                table.addHeaderCell(new Cell()
+                        .add(new Paragraph(header).setFont(boldFont))
+                        .setBackgroundColor(ColorConstants.LIGHT_GRAY));
+            }
+
+            // Dữ liệu dịch vụ
+            String serviceName = serviceBooking.getService() != null ?
+                    serviceBooking.getService().getName() : "Dịch vụ không xác định";
+
+            table.addCell(new Cell().add(new Paragraph(serviceName).setFont(regularFont)));
+            table.addCell(new Cell().add(new Paragraph("1").setFont(regularFont)));
+            table.addCell(new Cell().add(new Paragraph(formatCurrency(serviceBooking.getTotalPrice())).setFont(regularFont)));
+
+            document.add(table);
+
+            // Tổng tiền
+            document.add(new Paragraph("Tổng cộng: " + formatCurrency(serviceBooking.getTotalPrice()))
                     .setFont(boldFont)
                     .setTextAlignment(TextAlignment.RIGHT)
-                    .setFontSize(12)
+                    .setFontSize(14)
                     .setMarginTop(10)
                     .setMarginBottom(20));
 
-            // Chữ ký và cảm ơn
-            addSignatureAndThanks(document, boldFont, regularFont);
+            // Thêm ghi chú thanh toán
+            document.add(new Paragraph("Ghi chú:")
+                    .setFont(boldFont)
+                    .setFontSize(12));
+            document.add(new Paragraph("- Vui lòng đến đúng giờ hẹn")
+                    .setFont(regularFont)
+                    .setFontSize(10));
+            document.add(new Paragraph("- Mang theo giấy tờ tùy thân khi đến khám")
+                    .setFont(regularFont)
+                    .setFontSize(10)
+                    .setMarginBottom(20));
 
-            return baos.toByteArray();
-        } catch (Exception e) {
-            logger.error("Lỗi khi tạo PDF dịch vụ: {}", e.getMessage(), e);
-            throw e;
-        } finally {
+            // Thêm chân trang
+            document.add(new Paragraph(COMPANY_NAME)
+                    .setFont(boldFont)
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(10));
+            document.add(new Paragraph("Cảm ơn quý khách đã sử dụng dịch vụ!")
+                    .setFont(regularFont)
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(8));
+
+            // Thêm QR code
             try {
-                document.close();
+                BarcodeQRCode qrCode = new BarcodeQRCode("SERVICE:" + serviceBooking.getId().toString());
+                PdfFormXObject qrCodeObject = qrCode.createFormXObject(ColorConstants.BLACK, document.getPdfDocument());
+                Image qrCodeImage = new Image(qrCodeObject).setWidth(60).setHeight(60);
+
+                // Thêm vào góc phải trên của tài liệu
+                qrCodeImage.setFixedPosition(
+                        document.getPdfDocument().getDefaultPageSize().getWidth() - 80,
+                        document.getPdfDocument().getDefaultPageSize().getHeight() - 80
+                );
+
+                document.add(qrCodeImage);
+                logger.debug("Đã thêm mã QR thành công");
             } catch (Exception e) {
-                logger.error("Lỗi khi đóng PDF document dịch vụ: {}", e.getMessage());
+                logger.warn("Không thể tạo mã QR: {}", e.getMessage());
             }
+
+            // Tự động đóng document thông qua try-with-resources
+
+            byte[] pdfBytes = baos.toByteArray();
+            logger.info("Tạo PDF thành công cho đặt dịch vụ ID: {}, Kích thước: {} bytes",
+                    serviceBooking.getId(), pdfBytes.length);
+
+            return pdfBytes;
+        } catch (Exception e) {
+            logger.error("Lỗi khi tạo PDF cho đặt dịch vụ {}: {}",
+                    serviceBooking.getId(), e.getMessage(), e);
+            throw new ServiceException("Không thể tạo PDF: " + e.getMessage(), e);
         }
     }
 
@@ -956,7 +1080,7 @@ public class EmailServiceImpl implements EmailService {
      * Xây dựng URL đặt lại mật khẩu
      */
     private String buildResetPasswordUrl(String resetToken) {
-        return frontendUrl + "/reset-password?token=" + resetToken;
+        return frontendUrl + "/forgot-password?token=" + resetToken;
     }
 
     /**

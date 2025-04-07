@@ -7,10 +7,13 @@ import com.google.api.client.json.gson.GsonFactory;
 import hunre.edu.vn.backend.dto.UserDTO;
 import hunre.edu.vn.backend.entity.*;
 import hunre.edu.vn.backend.exception.ResourceNotFoundException;
+import hunre.edu.vn.backend.exception.ServiceException;
 import hunre.edu.vn.backend.mapper.UserMapper;
 import hunre.edu.vn.backend.repository.*;
+import hunre.edu.vn.backend.service.EmailService;
 import hunre.edu.vn.backend.service.UserService;
 import hunre.edu.vn.backend.utils.JwtTokenProvider;
+import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -28,6 +31,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -55,6 +59,8 @@ public class UserServiceImpl implements UserService {
     private PatientProfileRepository patientProfileRepository;
     @Autowired
     private DoctorProfileRepository doctorProfileRepository;
+    @Autowired
+    private EmailService emailService;
 
     public UserServiceImpl(UserMapper userMapper, UserRepository userRepository, PasswordEncoder passwordEncoder, S3Service s3Service, AuthenticationManager authenticationManager) {
         this.userMapper = userMapper;
@@ -415,5 +421,63 @@ public class UserServiceImpl implements UserService {
         return patientProfileRepository.findByUserId(userId)
                 .map(PatientProfile::getId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ bệnh nhân cho người dùng này"));
+    }
+
+    @Override
+    public String generatePasswordResetToken(String email) {
+        // Tìm người dùng theo email
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
+
+        // Tạo token reset mật khẩu
+        String resetToken = UUID.randomUUID().toString();
+
+        // Lưu token và thời gian hết hạn (ví dụ: 1 giờ)
+        user.setResetPasswordToken(resetToken);
+        user.setResetPasswordExpiry(LocalDateTime.now().plusHours(1));
+
+        userRepository.save(user);
+
+        // Gửi email reset mật khẩu
+        try {
+            emailService.sendPasswordResetEmail(user, resetToken);
+        } catch (MessagingException e) {
+            throw new ServiceException("Không thể gửi email đặt lại mật khẩu", e);
+        }
+
+        return resetToken;
+    }
+
+    @Override
+    public boolean validatePasswordResetToken(String token) {
+        User user = userRepository.findByResetPasswordToken(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Token không hợp lệ"));
+
+        // Kiểm tra token đã hết hạn chưa
+        return user.getResetPasswordExpiry() != null &&
+                user.getResetPasswordExpiry().isAfter(LocalDateTime.now());
+    }
+
+    @Override
+    @Transactional
+    public boolean resetPassword(String token, String newPassword) {
+        User user = userRepository.findByResetPasswordToken(token)
+                .orElseThrow(() -> new ResourceNotFoundException("Token không hợp lệ"));
+
+        // Kiểm tra token còn hiệu lực
+        if (user.getResetPasswordExpiry() == null ||
+                user.getResetPasswordExpiry().isBefore(LocalDateTime.now())) {
+            throw new ServiceException("Token đã hết hạn");
+        }
+
+        // Mã hóa mật khẩu mới
+        user.setPassword(passwordEncoder.encode(newPassword));
+
+        // Xóa token sau khi reset
+        user.setResetPasswordToken(null);
+        user.setResetPasswordExpiry(null);
+
+        userRepository.save(user);
+        return true;
     }
 }
