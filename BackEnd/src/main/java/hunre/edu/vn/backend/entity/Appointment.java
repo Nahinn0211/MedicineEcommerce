@@ -15,7 +15,6 @@ import java.time.LocalTime;
 @AllArgsConstructor
 @Builder
 @EqualsAndHashCode(callSuper = true)
-
 public class Appointment extends BaseEntity {
     @NotNull(message = "Bệnh nhân không được trống")
     @ManyToOne(fetch = FetchType.EAGER)

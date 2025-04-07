@@ -68,9 +68,12 @@ public class VoucherDTO {
 
         private LocalDateTime startDate;
         private LocalDateTime endDate;
-        private BigDecimal minimumOrderValue;
-    }
 
+        private BigDecimal minimumOrderValue;
+
+        // Thêm trường status
+        private Voucher.VoucherStatus status;
+    }
     public static GetVoucherDTO fromEntity(Voucher voucher) {
         if (voucher == null) {
             return null;

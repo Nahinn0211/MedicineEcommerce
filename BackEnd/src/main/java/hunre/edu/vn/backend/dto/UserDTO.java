@@ -33,9 +33,17 @@ public class UserDTO {
         private String avatar;
         private Integer countLock;
         private List<RoleDTO.GetRoleDTO> roles;
-        private List<SocialAccountDTO.GetSocialAccountDTO> socialAccounts;
-        private LocalDateTime createdAt;
+         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class SaveUserWithRolesDTO {
+        private UserDTO.SaveUserDTO user;
+        private List<Long> roleIds;
     }
 
     @Data
@@ -93,22 +101,6 @@ public class UserDTO {
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .build();
-
-        // Set roles
-        if (user.getUserRoles() != null) {
-            dto.setRoles(user.getUserRoles().stream()
-                    .filter(ur -> !ur.getIsDeleted())
-                    .map(ur -> RoleDTO.fromEntity(ur.getRole()))
-                    .collect(Collectors.toList()));
-        }
-
-        // Set social accounts
-        if (user.getSocialAccounts() != null) {
-            dto.setSocialAccounts(user.getSocialAccounts().stream()
-                    .filter(sa -> !sa.getIsDeleted())
-                    .map(SocialAccountDTO::fromEntity)
-                    .collect(Collectors.toList()));
-        }
 
         return dto;
     }

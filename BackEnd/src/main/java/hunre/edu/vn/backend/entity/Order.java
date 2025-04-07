@@ -41,6 +41,10 @@ public class Order extends BaseEntity {
     @Column(name = "total_price", nullable = false)
     private BigDecimal totalPrice;
 
+    @Column(name = "sub_total", nullable = false)
+    @DecimalMin(value = "0.0", message = "Tổng tiền hàng phải lớn hơn hoặc bằng 0")
+    private BigDecimal subTotal;
+
     @NotNull(message = "Phương thức thanh toán không được trống")
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false)
@@ -64,6 +68,20 @@ public class Order extends BaseEntity {
     @Column(name = "note", nullable = true, columnDefinition = "nvarchar(MAX)")
     private String note;
 
+    @Column(name = "shipping_address", nullable = false, columnDefinition = "nvarchar(MAX)")
+    private String shippingAddress;
+
+    @Column(name = "shipping_phone", nullable = false)
+    @Pattern(regexp = "^[0-9]{10,12}$", message = "Số điện thoại phải từ 10-12 chữ số")
+    private String shippingPhone;
+
+    @Column(name = "shipping_name", nullable = false, columnDefinition = "nvarchar(255)")
+    private String shippingName;
+
+    @Column(name = "shipping_fee", nullable = false)
+    @DecimalMin(value = "0.0", message = "Phí vận chuyển phải lớn hơn hoặc bằng 0")
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
@@ -76,9 +94,46 @@ public class Order extends BaseEntity {
     @Formula("(SELECT COUNT(od.id) FROM order_details od WHERE od.order_id = id)")
     private Integer itemCount;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderDetail> orderDetails = new ArrayList<>();
+
+    public void addOrderDetail(OrderDetail orderDetail) {
+        this.orderDetails.add(orderDetail);
+        orderDetail.setOrder(this);
+
+        this.calculateSubTotal();
+        this.calculateTotalPrice();
+    }
+
+    public void removeOrderDetail(OrderDetail orderDetail) {
+        this.orderDetails.remove(orderDetail);
+        orderDetail.setOrder(null);
+
+        this.calculateSubTotal();
+        this.calculateTotalPrice();
+    }
+
+    public void calculateSubTotal() {
+        this.subTotal = this.orderDetails.stream()
+                .map(detail -> detail.getUnitPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    public void calculateTotalPrice() {
+        this.totalPrice = this.subTotal
+                .subtract(this.discountAmount != null ? this.discountAmount : BigDecimal.ZERO)
+                .add(this.shippingFee != null ? this.shippingFee : BigDecimal.ZERO);
+    }
+
+    public void applyVoucher(Voucher voucher) {
+        if (voucher != null) {
+            this.voucherCode = voucher.getCode();
+            this.discountAmount = this.subTotal.multiply(
+                    BigDecimal.valueOf(voucher.getVoucherPercentage() / 100.0));
+            this.calculateTotalPrice();
+        }
+    }
 
     public void complete() {
         this.status = OrderStatus.COMPLETED;
@@ -91,13 +146,13 @@ public class Order extends BaseEntity {
         this.cancelledAt = LocalDateTime.now();
         this.cancelledReason = reason;
 
-        if (this.paymentStatus == PaymentStatus.COMPLETED && this.paymentMethod != PaymentMethod.CASH) {
+        if (this.paymentStatus == PaymentStatus.COMPLETED) {
             this.patient.updateAccountBalance(this.totalPrice);
         }
     }
 
     public void process() {
-        this.status = OrderStatus.CONFIRMED;
+        this.status = OrderStatus.PROCESSING;
     }
 
     public void updatePaymentStatus(PaymentStatus paymentStatus) {

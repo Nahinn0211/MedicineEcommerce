@@ -53,7 +53,7 @@ public class ChatMessage extends BaseEntity {
     @Column(name = "message_type", nullable = false)
     private MessageType messageType;
 
-    @Column(name = "is_edited", nullable = true)
+    @Column(name = "is_edited", nullable = false)
     private Boolean isEdited = false;
 
     @Column(name = "edited_at")

@@ -27,6 +27,13 @@ public class UserRoleDTO {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
     }
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class GetRoleUserDTO {
+        private Long id;
+    }
 
     @Data
     @NoArgsConstructor

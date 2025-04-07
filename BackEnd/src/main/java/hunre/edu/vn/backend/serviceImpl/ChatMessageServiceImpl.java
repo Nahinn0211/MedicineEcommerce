@@ -42,9 +42,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .messageType(dto.getMessageType())
                 .sentAt(LocalDateTime.now())
                 .build();
-        if (message.getIsEdited() == null) {
-            message.setIsEdited(false);
-        }
 
         ChatMessage saved = chatMessageRepository.save(message);
         return chatMessageMapper.toGetChatMessageDTO(saved);

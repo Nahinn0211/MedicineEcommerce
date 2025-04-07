@@ -4,16 +4,15 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
+import hunre.edu.vn.backend.dto.RoleDTO;
+import hunre.edu.vn.backend.dto.SocialAccountDTO;
 import hunre.edu.vn.backend.dto.UserDTO;
 import hunre.edu.vn.backend.entity.*;
 import hunre.edu.vn.backend.exception.ResourceNotFoundException;
-import hunre.edu.vn.backend.exception.ServiceException;
 import hunre.edu.vn.backend.mapper.UserMapper;
 import hunre.edu.vn.backend.repository.*;
-import hunre.edu.vn.backend.service.EmailService;
 import hunre.edu.vn.backend.service.UserService;
 import hunre.edu.vn.backend.utils.JwtTokenProvider;
-import jakarta.mail.MessagingException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -31,7 +30,6 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,34 +39,40 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final S3Service s3Service;
     private final AuthenticationManager authenticationManager;
+
     @Value("${google.client-id}")
     private String googleClientId;
 
     @Value("${facebook.app-id}")
     private String facebookAppId;
+
     @Value("${facebook.app-secret}")
     private String facebookAppSecret;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+
     @Autowired
     private UserRoleRepository userRoleRepository;
+
     @Autowired
     private RoleRepository roleRepository;
+
     @Autowired
     private PatientProfileRepository patientProfileRepository;
+
     @Autowired
     private DoctorProfileRepository doctorProfileRepository;
-    @Autowired
-    private EmailService emailService;
 
-    public UserServiceImpl(UserMapper userMapper, UserRepository userRepository, PasswordEncoder passwordEncoder, S3Service s3Service, AuthenticationManager authenticationManager) {
+    public UserServiceImpl(UserMapper userMapper, UserRepository userRepository, PasswordEncoder passwordEncoder,
+                           S3Service s3Service, AuthenticationManager authenticationManager) {
         this.userMapper = userMapper;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.s3Service = s3Service;
         this.authenticationManager = authenticationManager;
     }
+
     @Override
     public boolean isUserInRole(Long userId, String roleName) {
         return userRepository.findById(userId)
@@ -76,7 +80,56 @@ public class UserServiceImpl implements UserService {
                         .anyMatch(role -> role.getName().equals(roleName)))
                 .orElse(false);
     }
+
+    /**
+     * Phương thức tiện ích để gán vai trò mặc định cho người dùng mới
+     */
+    private void assignDefaultRoleToUser(User user) {
+        // Tìm vai trò USER (ưu tiên tìm theo tên)
+        Optional<Role> roleOptional = roleRepository.findByName("USER");
+
+        if (roleOptional.isEmpty()) {
+            // Nếu không tìm thấy theo tên, thử tìm theo ID 3
+            roleOptional = roleRepository.findById(3L);
+        }
+
+        Role role = roleOptional.orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò USER"));
+
+        // Kiểm tra xem người dùng đã có vai trò này chưa
+        boolean hasRole = false;
+        if (user.getRoles() != null) {
+            hasRole = user.getRoles().stream()
+                    .anyMatch(r -> r.getId().equals(role.getId()));
+        }
+
+        if (!hasRole) {
+            // Tạo liên kết vai trò
+            UserRole userRole = new UserRole();
+            userRole.setUser(user);
+            userRole.setRole(role);
+            userRole.setCreatedAt(LocalDateTime.now());
+            userRole.setUpdatedAt(LocalDateTime.now());
+            userRoleRepository.save(userRole);
+        }
+    }
+
+    /**
+     * Phương thức tiện ích để tạo hồ sơ bệnh nhân mặc định cho người dùng mới
+     */
+    private void createDefaultPatientProfile(User user) {
+        // Kiểm tra xem người dùng đã có hồ sơ bệnh nhân chưa
+        if (patientProfileRepository.findByUserId(user.getId()).isEmpty()) {
+            PatientProfile patientProfile = new PatientProfile();
+            patientProfile.setUser(user);
+            patientProfile.setCreatedAt(LocalDateTime.now());
+            patientProfile.setUpdatedAt(LocalDateTime.now());
+            patientProfileRepository.save(patientProfile);
+        }
+    }
+
+    // CREATE - Đăng ký người dùng mới
     @Override
+    @Transactional
     public UserDTO.GetUserDTO register(UserDTO.SaveUserDTO userDTO) {
         // Kiểm tra email đã tồn tại
         if (userRepository.findByEmail(userDTO.getEmail()).isPresent()) {
@@ -94,24 +147,177 @@ public class UserServiceImpl implements UserService {
 
         // Lưu người dùng
         User savedUser = userRepository.save(userDtoToEntity(userDTO));
-        Optional<Role> roleOptional = roleRepository.findById(3L);
-        Role role = roleOptional.orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò"));
 
-        UserRole userRole = new UserRole();
-        userRole.setUser(savedUser);
-        userRole.setRole(role);
-        userRoleRepository.save(userRole);
+        // Gán vai trò mặc định
+        assignDefaultRoleToUser(savedUser);
 
-        PatientProfile patientProfile = new PatientProfile();
-        patientProfile.setUser(savedUser);
-        patientProfileRepository.save(patientProfile);
-
-        // Lưu vai trò người dùng
-        userRoleRepository.save(userRole);
+        // Tạo hồ sơ bệnh nhân mặc định
+        createDefaultPatientProfile(savedUser);
 
         return entityToGetUserDTO(savedUser);
     }
 
+    // CREATE/UPDATE - Tạo mới hoặc cập nhật người dùng
+    @Override
+    @Transactional
+    public UserDTO.GetUserDTO saveOrUpdate(UserDTO.SaveUserDTO userDTO) {
+        // Kiểm tra email đã tồn tại (đối với người dùng mới)
+        if (userDTO.getId() == null && userRepository.findByEmail(userDTO.getEmail()).isPresent()) {
+            throw new IllegalArgumentException("Email đã tồn tại: " + userDTO.getEmail());
+        }
+
+        User user;
+
+        if (userDTO.getId() == null || userDTO.getId() == 0) {
+            // Tạo mới người dùng
+            user = new User();
+            user.setCreatedAt(userDTO.getCreatedAt() != null ? userDTO.getCreatedAt() : LocalDateTime.now());
+
+            // Đảm bảo mật khẩu được cung cấp cho người dùng mới
+            if (userDTO.getPassword() == null || userDTO.getPassword().isEmpty()) {
+                throw new IllegalArgumentException("Mật khẩu không được để trống khi tạo người dùng mới");
+            }
+            user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
+
+            // Đặt giá trị mặc định nếu không được cung cấp
+            user.setEnabled(userDTO.getEnabled() != null ? userDTO.getEnabled() : true);
+            user.setLocked(userDTO.getLocked() != null ? userDTO.getLocked() : false);
+            user.setCountLock(userDTO.getCountLock() != null ? userDTO.getCountLock() : 0);
+        } else {
+            // Cập nhật người dùng hiện có
+            user = userRepository.findById(userDTO.getId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng có ID: " + userDTO.getId()));
+
+            // Kiểm tra tính duy nhất của email nếu đã thay đổi
+            if (!user.getEmail().equals(userDTO.getEmail()) &&
+                    userRepository.findByEmail(userDTO.getEmail()).isPresent()) {
+                throw new IllegalArgumentException("Email đã tồn tại: " + userDTO.getEmail());
+            }
+
+            // Chỉ cập nhật mật khẩu nếu được cung cấp
+            if (userDTO.getPassword() != null && !userDTO.getPassword().isEmpty()) {
+                user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
+            }
+
+            // Chỉ cập nhật các trường được cung cấp
+            if (userDTO.getEnabled() != null) user.setEnabled(userDTO.getEnabled());
+            if (userDTO.getLocked() != null) user.setLocked(userDTO.getLocked());
+            if (userDTO.getCountLock() != null) user.setCountLock(userDTO.getCountLock());
+        }
+
+        // Cập nhật các trường thông thường
+        user.setUpdatedAt(userDTO.getUpdatedAt() != null ? userDTO.getUpdatedAt() : LocalDateTime.now());
+        user.setFullName(userDTO.getFullName());
+        if (userDTO.getPhone() != null) user.setPhone(userDTO.getPhone());
+        if (userDTO.getAddress() != null) user.setAddress(userDTO.getAddress());
+        user.setEmail(userDTO.getEmail());
+
+        // Xử lý avatar
+        if (userDTO.getAvatar() != null && !userDTO.getAvatar().trim().isEmpty()) {
+            user.setAvatar(userDTO.getAvatar());
+        } else if (user.getAvatar() == null) {
+            user.setAvatar("default-avatar.png");
+        }
+
+        // Lưu người dùng
+        User savedUser = userRepository.save(user);
+
+        // Nếu là người dùng mới, tạo các thông tin liên quan mặc định
+        if (userDTO.getId() == null || userDTO.getId() == 0) {
+            // Gán vai trò mặc định
+            assignDefaultRoleToUser(savedUser);
+
+            // Tạo hồ sơ bệnh nhân mặc định
+            createDefaultPatientProfile(savedUser);
+        }
+
+        return entityToGetUserDTO(savedUser);
+    }
+
+    // READ - Lấy tất cả người dùng
+    @Override
+    public List<UserDTO.GetUserDTO> findAll() {
+        return userRepository.findAllActive()
+                .stream()
+                .map(userMapper::toGetUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // READ - Lấy người dùng theo ID
+    @Override
+    public Optional<UserDTO.GetUserDTO> findById(Long id) {
+        return userRepository.findActiveById(id)
+                .map(userMapper::toGetUserDTO);
+
+    }
+
+    // READ - Lấy người dùng theo email
+    @Override
+    public Optional<UserDTO.GetUserDTO> findByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .map(userMapper::toGetUserDTO);
+    }
+
+    // READ - Lấy người dùng theo tên
+    @Override
+    public List<UserDTO.GetUserDTO> findByFullNameContaining(String fullName) {
+        return userRepository.findByFullNameContaining(fullName)
+                .stream()
+                .map(userMapper::toGetUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // READ - Lấy người dùng theo số điện thoại
+    @Override
+    public List<UserDTO.GetUserDTO> findByPhone(String phone) {
+        return userRepository.findByPhone(phone)
+                .stream()
+                .map(userMapper::toGetUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // READ - Lấy người dùng theo địa chỉ
+    @Override
+    public List<UserDTO.GetUserDTO> findByAddressContaining(String address) {
+        return userRepository.findByAddressContaining(address)
+                .stream()
+                .map(userMapper::toGetUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // READ - Lấy người dùng theo trạng thái kích hoạt
+    @Override
+    public List<UserDTO.GetUserDTO> findByEnabled(Boolean enabled) {
+        return userRepository.findByEnabled(enabled)
+                .stream()
+                .map(userMapper::toGetUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // READ - Lấy người dùng theo trạng thái khóa
+    @Override
+    public List<UserDTO.GetUserDTO> findByLocked(Boolean locked) {
+        return userRepository.findByLocked(locked)
+                .stream()
+                .map(userMapper::toGetUserDTO)
+                .collect(Collectors.toList());
+    }
+
+    // DELETE - Xóa nhiều người dùng theo danh sách ID
+    @Override
+    @Transactional
+    public String deleteByList(List<Long> ids) {
+        int count = 0;
+        for (Long id : ids) {
+            if (userRepository.existsById(id)) {
+                userRepository.softDelete(id);
+                count++;
+            }
+        }
+        return "Đã xóa " + count + " tài khoản";
+    }
+
+    // Đăng nhập thông thường
     @Override
     public String login(String email, String password) {
         Authentication authentication = authenticationManager.authenticate(
@@ -122,142 +328,12 @@ public class UserServiceImpl implements UserService {
         return jwtTokenProvider.generateToken(authentication);
     }
 
-    @Override
-    public List<UserDTO.GetUserDTO> findAll() {
-        return userRepository.findAll()
-                .stream()
-                .map(userMapper::toGetUserDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public Optional<UserDTO.GetUserDTO> findById(Long id) {
-        return userRepository.findById(id)
-                .map(userMapper::toGetUserDTO);
-    }
-
-    @Override
-    @Transactional
-    public UserDTO.GetUserDTO saveOrUpdate(UserDTO.SaveUserDTO userDTO) {
-        if (userDTO.getId() == null && userRepository.findByEmail(userDTO.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Email already exists: " + userDTO.getEmail());
-        }
-
-        User user;
-
-        if (userDTO.getId() == null) {
-            user = new User();
-            user.setCreatedAt(LocalDateTime.now());
-
-            if (userDTO.getPassword() == null || userDTO.getPassword().isEmpty()) {
-                throw new IllegalArgumentException("Password is required for new users");
-            }
-            user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
-        } else {
-            user = userRepository.findById(userDTO.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userDTO.getId()));
-
-            if (!user.getEmail().equals(userDTO.getEmail()) &&
-                    userRepository.findByEmail(userDTO.getEmail()).isPresent()) {
-                throw new IllegalArgumentException("Email already exists: " + userDTO.getEmail());
-            }
-
-            if (userDTO.getPassword() != null && !userDTO.getPassword().isEmpty()) {
-                user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
-            }
-        }
-
-        user.setUpdatedAt(LocalDateTime.now());
-        user.setFullName(userDTO.getFullName());
-        user.setPhone(userDTO.getPhone());
-        user.setAddress(userDTO.getAddress());
-        user.setEmail(userDTO.getEmail());
-        user.setEnabled(userDTO.getEnabled() != null ? userDTO.getEnabled() : true);
-        user.setLocked(userDTO.getLocked() != null ? userDTO.getLocked() : false);
-        user.setCountLock(userDTO.getCountLock() != null ? userDTO.getCountLock() : 0);
-
-        if (userDTO.getAvatar() != null && !userDTO.getAvatar().trim().isEmpty()) {
-            user.setAvatar(userDTO.getAvatar());
-        } else if (user.getAvatar() == null) {
-            user.setAvatar("default-avatar.png");
-        }
-
-        User savedUser = userRepository.save(user);
-        return userMapper.toGetUserDTO(savedUser);
-    }
-
-    @Override
-    public String deleteByList(List<Long> ids) {
-        for (Long id : ids) {
-            if (userRepository.existsById(id)) {
-                userRepository.softDelete(id);
-            }
-        }
-
-        return "Đã xóa " + ids.size() + " tài khoản";
-    }
-
-    @Override
-    public Optional<UserDTO.GetUserDTO> findByEmail(String email) {
-        return userRepository.findByEmail(email)
-                .map(userMapper::toGetUserDTO);
-    }
-
-    @Override
-    public List<UserDTO.GetUserDTO> findByFullNameContaining(String fullName) {
-        return userRepository.findByFullNameContaining(fullName)
-                .stream()
-                .map(userMapper::toGetUserDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<UserDTO.GetUserDTO> findByPhone(String phone) {
-        return userRepository.findByPhone(phone)
-                .stream()
-                .map(userMapper::toGetUserDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public String uploadAvatar(MultipartFile file) throws IOException {
-        return s3Service.uploadFile(file);
-    }
-
-    @Override
-    public void deleteAvatar(String avatar) {
-        s3Service.deleteFile(avatar);
-    }
-
-    @Override
-    public List<UserDTO.GetUserDTO> findByAddressContaining(String address) {
-        return userRepository.findByAddressContaining(address)
-                .stream()
-                .map(userMapper::toGetUserDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<UserDTO.GetUserDTO> findByEnabled(Boolean enabled) {
-        return userRepository.findByEnabled(enabled)
-                .stream()
-                .map(userMapper::toGetUserDTO)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<UserDTO.GetUserDTO> findByLocked(Boolean locked) {
-        return userRepository.findByLocked(locked)
-                .stream()
-                .map(userMapper::toGetUserDTO)
-                .collect(Collectors.toList());
-    }
-
+    // Đăng nhập Google
     @Override
     @Transactional
     public String loginWithGoogle(String googleAccessToken) {
         try {
-            // Verify Google Access Token
+            // Xác thực token Google
             GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                     new NetHttpTransport(),
                     new GsonFactory())
@@ -274,14 +350,14 @@ public class UserServiceImpl implements UserService {
             String fullName = (String) payload.get("name");
             String avatarUrl = (String) payload.get("picture");
 
-            // Find or create user
+            // Tìm hoặc tạo người dùng
             Optional<User> existingUser = userRepository.findByEmail(email);
             User user;
 
             if (existingUser.isPresent()) {
                 user = existingUser.get();
             } else {
-                // Create new user for Google login
+                // Tạo người dùng mới cho đăng nhập Google
                 user = new User();
                 user.setEmail(email);
                 user.setFullName(fullName);
@@ -291,24 +367,30 @@ public class UserServiceImpl implements UserService {
                 user.setCreatedAt(LocalDateTime.now());
                 user.setUpdatedAt(LocalDateTime.now());
 
-                // Generate a random password for social login users
+                // Tạo mật khẩu ngẫu nhiên cho người dùng đăng nhập xã hội
                 String randomPassword = passwordEncoder.encode(
                         "GOOGLE_" + System.currentTimeMillis()
                 );
                 user.setPassword(randomPassword);
 
                 user = userRepository.save(user);
+
+                // Gán vai trò mặc định
+                assignDefaultRoleToUser(user);
+
+                // Tạo hồ sơ bệnh nhân mặc định
+                createDefaultPatientProfile(user);
             }
 
-            // Create authentication token
+            // Tạo token xác thực
             Authentication authentication = new UsernamePasswordAuthenticationToken(
                     user.getEmail(),
                     user.getPassword(),
-                    Collections.emptyList()
+                    user.getAuthorities()
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // Generate JWT token
+            // Tạo JWT token
             return jwtTokenProvider.generateToken(authentication);
 
         } catch (GeneralSecurityException | IOException e) {
@@ -316,19 +398,22 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    // Đăng nhập Facebook
     @Override
     @Transactional
     public String loginWithFacebook(String facebookAccessToken) {
         try {
+            // TODO: Implement actual Facebook authentication logic
             String facebookGraphUrl = String.format(
                     "https://graph.facebook.com/me?fields=id,name,email&access_token=%s",
                     facebookAccessToken
             );
-            
-            String email = ""; // Retrieve from Facebook response
-            String fullName = ""; // Retrieve from Facebook response
 
-            // Find or create user
+            // Giả sử dữ liệu đã được lấy từ Facebook
+            String email = "facebook-user@example.com"; // Thay thế bằng dữ liệu thực từ Facebook
+            String fullName = "Facebook User"; // Thay thế bằng dữ liệu thực từ Facebook
+
+            // Tìm hoặc tạo người dùng
             Optional<User> existingUser = userRepository.findByEmail(email);
             User user;
 
@@ -343,24 +428,30 @@ public class UserServiceImpl implements UserService {
                 user.setCreatedAt(LocalDateTime.now());
                 user.setUpdatedAt(LocalDateTime.now());
 
-                // Generate a random password for social login users
+                // Tạo mật khẩu ngẫu nhiên cho người dùng đăng nhập xã hội
                 String randomPassword = passwordEncoder.encode(
                         "FACEBOOK_" + System.currentTimeMillis()
                 );
                 user.setPassword(randomPassword);
 
                 user = userRepository.save(user);
+
+                // Gán vai trò mặc định
+                assignDefaultRoleToUser(user);
+
+                // Tạo hồ sơ bệnh nhân mặc định
+                createDefaultPatientProfile(user);
             }
 
-            // Create authentication token
+            // Tạo token xác thực
             Authentication authentication = new UsernamePasswordAuthenticationToken(
                     user.getEmail(),
                     user.getPassword(),
-                    Collections.emptyList()
+                    user.getAuthorities()
             );
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            // Generate JWT token
+            // Tạo JWT token
             return jwtTokenProvider.generateToken(authentication);
 
         } catch (Exception e) {
@@ -368,21 +459,60 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    // Đổi mật khẩu
     @Override
+    @Transactional
     public Optional<UserDTO.GetUserDTO> changePassword(String oldPassword, String newPassword, Long id) {
-        User user = userRepository.findById(id).get();
-        if (passwordEncoder.matches(oldPassword, user.getPassword())) {
-            user.setPassword(passwordEncoder.encode(newPassword));
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng có ID: " + id));
+
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new IllegalArgumentException("Mật khẩu cũ không chính xác");
         }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
-        return Optional.of(userMapper.toGetUserDTO(user));
+
+        return Optional.of(entityToGetUserDTO(user));
     }
 
+    // Upload avatar
+    @Override
+    public String uploadAvatar(MultipartFile file) throws IOException {
+        return s3Service.uploadFile(file);
+    }
+
+    // Xóa avatar
+    @Override
+    public void deleteAvatar(String avatar) {
+        if (avatar != null && !avatar.equals("default-avatar.png")) {
+            s3Service.deleteFile(avatar);
+        }
+    }
+
+    // Lấy ID hồ sơ bác sĩ từ ID người dùng
+    @Override
+    public Long getDoctorProfileIdByUserId(Long userId) {
+        return doctorProfileRepository.findByUser_Id(userId)
+                .map(DoctorProfile::getId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ bác sĩ cho người dùng này"));
+    }
+
+    // Lấy ID hồ sơ bệnh nhân từ ID người dùng
+    @Override
+    public Long getPatientProfileIdByUserId(Long userId) {
+        return patientProfileRepository.findByUserId(userId)
+                .map(PatientProfile::getId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ bệnh nhân cho người dùng này"));
+    }
+
+    // Helper method: Chuyển đổi từ DTO sang Entity
     private User userDtoToEntity(UserDTO.SaveUserDTO userDTO) {
         User user = new User();
         user.setId(userDTO.getId());
         user.setEmail(userDTO.getEmail());
-        user.setPassword(userDTO.getPassword());
+        user.setPassword(userDTO.getPassword()); // Lưu ý: Mật khẩu chưa được mã hóa tại đây
         user.setFullName(userDTO.getFullName());
         user.setPhone(userDTO.getPhone());
         user.setAddress(userDTO.getAddress());
@@ -394,90 +524,25 @@ public class UserServiceImpl implements UserService {
         return user;
     }
 
+    // Helper method: Chuyển đổi từ Entity sang DTO với đầy đủ thông tin liên quan
     private UserDTO.GetUserDTO entityToGetUserDTO(User user) {
-        UserDTO.GetUserDTO userDto = new UserDTO.GetUserDTO();
-        userDto.setId(user.getId());
-        userDto.setEmail(user.getEmail());
-        userDto.setFullName(user.getFullName());
-        userDto.setPhone(user.getPhone());
-        userDto.setAddress(user.getAddress());
-        userDto.setEnabled(user.isEnabled());
-        userDto.setLocked(user.isLocked());
-        userDto.setAvatar(user.getAvatar());
-        userDto.setCreatedAt(user.getCreatedAt());
-        userDto.setUpdatedAt(user.getUpdatedAt());
-        return userDto;
-    }
-
-    @Override
-    public Long getDoctorProfileIdByUserId(Long userId) {
-        return doctorProfileRepository.findByUser_Id(userId)
-                .map(DoctorProfile::getId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ bác sĩ cho người dùng này"));
-    }
-
-    @Override
-    public Long getPatientProfileIdByUserId(Long userId) {
-        return patientProfileRepository.findByUserId(userId)
-                .map(PatientProfile::getId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy hồ sơ bệnh nhân cho người dùng này"));
-    }
-
-    @Override
-    public String generatePasswordResetToken(String email) {
-        // Tìm người dùng theo email
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với email: " + email));
-
-        // Tạo token reset mật khẩu
-        String resetToken = UUID.randomUUID().toString();
-
-        // Lưu token và thời gian hết hạn (ví dụ: 1 giờ)
-        user.setResetPasswordToken(resetToken);
-        user.setResetPasswordExpiry(LocalDateTime.now().plusHours(1));
-
-        userRepository.save(user);
-
-        // Gửi email reset mật khẩu
-        try {
-            emailService.sendPasswordResetEmail(user, resetToken);
-        } catch (MessagingException e) {
-            throw new ServiceException("Không thể gửi email đặt lại mật khẩu", e);
+        if (user == null) {
+            return null;
         }
+        UserDTO.GetUserDTO dto = new UserDTO.GetUserDTO();
+        dto.setId(user.getId());
+        dto.setFullName(user.getFullName());
+        dto.setEmail(user.getEmail());
+        dto.setPhone(user.getPhone());
+        dto.setAddress(user.getAddress());
+        dto.setLastLogin(user.getLastLogin());
+        dto.setEnabled(user.isEnabled());
+        dto.setLocked(user.isLocked());
+        dto.setAvatar(user.getAvatar());
+        dto.setCountLock(user.getCountLock());
+        dto.setCreatedAt(user.getCreatedAt());
+        dto.setUpdatedAt(user.getUpdatedAt());
 
-        return resetToken;
-    }
-
-    @Override
-    public boolean validatePasswordResetToken(String token) {
-        User user = userRepository.findByResetPasswordToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Token không hợp lệ"));
-
-        // Kiểm tra token đã hết hạn chưa
-        return user.getResetPasswordExpiry() != null &&
-                user.getResetPasswordExpiry().isAfter(LocalDateTime.now());
-    }
-
-    @Override
-    @Transactional
-    public boolean resetPassword(String token, String newPassword) {
-        User user = userRepository.findByResetPasswordToken(token)
-                .orElseThrow(() -> new ResourceNotFoundException("Token không hợp lệ"));
-
-        // Kiểm tra token còn hiệu lực
-        if (user.getResetPasswordExpiry() == null ||
-                user.getResetPasswordExpiry().isBefore(LocalDateTime.now())) {
-            throw new ServiceException("Token đã hết hạn");
-        }
-
-        // Mã hóa mật khẩu mới
-        user.setPassword(passwordEncoder.encode(newPassword));
-
-        // Xóa token sau khi reset
-        user.setResetPasswordToken(null);
-        user.setResetPasswordExpiry(null);
-
-        userRepository.save(user);
-        return true;
+        return dto;
     }
 }

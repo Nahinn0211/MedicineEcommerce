@@ -84,10 +84,10 @@ public class ServiceBooking extends BaseEntity {
         return this.status == BookingStatus.PENDING;
     }
 
-    public void cancel() {
+    public void cancel(String cancellationReason) {
         if (isCancellable()) {
             this.status = BookingStatus.CANCELLED;
-            addNotes("Hủy đặt lịch");
+            addNotes("Hủy đặt: " + cancellationReason);
         } else {
             throw new IllegalStateException("Không thể hủy đặt dịch vụ ở trạng thái hiện tại");
         }

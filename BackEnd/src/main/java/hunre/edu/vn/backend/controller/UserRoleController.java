@@ -30,16 +30,16 @@ public class UserRoleController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/save")
-    public ResponseEntity<UserRoleDTO.GetUserRoleDTO> saveOrUpdateUserRole(@RequestBody UserRoleDTO.SaveUserRoleDTO userRoleDTO) {
-        UserRoleDTO.GetUserRoleDTO savedUserRole = userRoleService.saveOrUpdate(userRoleDTO);
-        return ResponseEntity.ok(savedUserRole);
-    }
-
-    @DeleteMapping("/{id}")
-    public String deleteUserRole(@RequestBody List<Long> ids) {
-        return userRoleService.deleteByList(ids);
-    }
+//    @PostMapping("/save")
+//    public ResponseEntity<UserRoleDTO.GetUserRoleDTO> saveOrUpdateUserRole(@RequestBody UserRoleDTO.SaveUserRoleDTO userRoleDTO) {
+//        UserRoleDTO.GetUserRoleDTO savedUserRole = userRoleService.saveOrUpdate(userRoleDTO);
+//        return ResponseEntity.ok(savedUserRole);
+//    }
+//
+//    @DeleteMapping("/{id}")
+//    public String deleteUserRole(@RequestBody List<Long> ids) {
+//        return userRoleService.deleteByList(ids);
+//    }
 
     @GetMapping("/by-user/{userId}")
     public ResponseEntity<List<UserRoleDTO.GetUserRoleDTO>> getUserRolesByUserId(@PathVariable Long userId) {

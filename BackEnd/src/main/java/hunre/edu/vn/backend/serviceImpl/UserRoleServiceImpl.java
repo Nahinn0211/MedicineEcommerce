@@ -4,11 +4,12 @@ import hunre.edu.vn.backend.dto.UserRoleDTO;
 import hunre.edu.vn.backend.entity.Role;
 import hunre.edu.vn.backend.entity.User;
 import hunre.edu.vn.backend.entity.UserRole;
-import hunre.edu.vn.backend.mapper.UserRoleMapper;
+import hunre.edu.vn.backend.exception.ResourceNotFoundException;
 import hunre.edu.vn.backend.repository.RoleRepository;
 import hunre.edu.vn.backend.repository.UserRepository;
 import hunre.edu.vn.backend.repository.UserRoleRepository;
 import hunre.edu.vn.backend.service.UserRoleService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,96 +18,82 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+/**
+ * Service implementation cho quản lý UserRole
+ */
 @Service
 public class UserRoleServiceImpl implements UserRoleService {
-    private final UserRoleMapper userRoleMapper;
-    private final UserRoleRepository userRoleRepository;
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
 
-    public UserRoleServiceImpl(
-            UserRoleRepository userRoleRepository,
-            UserRoleMapper userRoleMapper,
-            UserRepository userRepository,
-            RoleRepository roleRepository) {
-        this.userRoleRepository = userRoleRepository;
-        this.userRoleMapper = userRoleMapper;
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-    }
+    @Autowired
+    private UserRoleRepository userRoleRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
     @Override
     public List<UserRoleDTO.GetUserRoleDTO> findAll() {
-        return userRoleRepository.findAllActive()
-                .stream()
-                .map(userRoleMapper::toGetUserRoleDTO)
+        return userRoleRepository.findAll().stream()
+                .map(UserRoleDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+    @Override
+    @Transactional
+    public UserRoleDTO.GetUserRoleDTO save(UserRoleDTO.SaveUserRoleDTO userRoleDTO) {
+        User user = userRepository.findById(userRoleDTO.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng có ID: " + userRoleDTO.getUserId()));
+
+        Role role = roleRepository.findById(userRoleDTO.getRoleId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy vai trò có ID: " + userRoleDTO.getRoleId()));
+
+        // Kiểm tra nếu đã tồn tại
+        Optional<UserRole> existingUserRole = userRoleRepository.findByUserIdAndRoleId(
+                userRoleDTO.getUserId(), userRoleDTO.getRoleId());
+
+        if (existingUserRole.isPresent()) {
+            return UserRoleDTO.fromEntity(existingUserRole.get());
+        }
+
+        UserRole userRole = new UserRole();
+        userRole.setUser(user);
+        userRole.setRole(role);
+        userRole.setCreatedAt(LocalDateTime.now());
+        userRole.setUpdatedAt(LocalDateTime.now());
+
+        UserRole savedUserRole = userRoleRepository.save(userRole);
+        return UserRoleDTO.fromEntity(savedUserRole);
     }
 
     @Override
     public Optional<UserRoleDTO.GetUserRoleDTO> findById(Long id) {
-        return userRoleRepository.findActiveById(id)
-                .map(userRoleMapper::toGetUserRoleDTO);
-    }
-
-    @Override
-    @Transactional
-    public UserRoleDTO.GetUserRoleDTO saveOrUpdate(UserRoleDTO.SaveUserRoleDTO userRoleDTO) {
-        UserRole userRole;
-
-        if (userRoleDTO.getId() == null || userRoleDTO.getId() == 0) {
-            // INSERT case
-            userRole = new UserRole();
-            userRole.setCreatedAt(LocalDateTime.now());
-            userRole.setUpdatedAt(LocalDateTime.now());
-        } else {
-            // UPDATE case
-            Optional<UserRole> existingUserRole = userRoleRepository.findActiveById(userRoleDTO.getId());
-            if (existingUserRole.isEmpty()) {
-                throw new RuntimeException("UserRole not found with ID: " + userRoleDTO.getId());
-            }
-            userRole = existingUserRole.get();
-            userRole.setUpdatedAt(LocalDateTime.now());
-        }
-
-        // Xử lý user relationship
-        User user = userRepository.findActiveById(userRoleDTO.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userRoleDTO.getUserId()));
-        userRole.setUser(user);
-
-        // Xử lý role relationship
-        Role role = roleRepository.findActiveById(userRoleDTO.getRoleId())
-                .orElseThrow(() -> new RuntimeException("Role not found with ID: " + userRoleDTO.getRoleId()));
-        userRole.setRole(role);
-
-        UserRole savedUserRole = userRoleRepository.save(userRole);
-        return userRoleMapper.toGetUserRoleDTO(savedUserRole);
-    }
-
-    @Override
-    public String deleteByList(List<Long> ids) {
-        for (Long id : ids) {
-            if (userRoleRepository.existsById(id)) {
-                userRoleRepository.softDelete(id);
-            }
-        }
-
-        return "Đã xóa thành công " + ids.size() + " liên kết giữa tài khoản và quyền hạn";
+        return userRoleRepository.findById(id)
+                .map(UserRoleDTO::fromEntity);
     }
 
     @Override
     public List<UserRoleDTO.GetUserRoleDTO> findByUserId(Long userId) {
-        return userRoleRepository.findByUserId(userId)
-                .stream()
-                .map(userRoleMapper::toGetUserRoleDTO)
+        return userRoleRepository.findByUserId(userId).stream()
+                .map(UserRoleDTO::fromEntity)
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<UserRoleDTO.GetUserRoleDTO> findByRoleId(Long roleId) {
-        return userRoleRepository.findByRoleId(roleId)
-                .stream()
-                .map(userRoleMapper::toGetUserRoleDTO)
+        return userRoleRepository.findByRoleId(roleId).stream()
+                .map(UserRoleDTO::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void deleteAllByUserId(Long userId) {
+        userRoleRepository.deleteAllByUserId(userId);
+    }
+
+    @Override
+    @Transactional
+    public void deleteById(Long id) {
+        userRoleRepository.deleteById(id);
     }
 }

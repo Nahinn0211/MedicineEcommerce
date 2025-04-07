@@ -49,22 +49,22 @@ public class RoleDTO {
         private String name;
     }
 
-    public static GetRoleDTO fromEntity(Role role) {
-        if (role == null) {
-            return null;
-        }
-
-        return GetRoleDTO.builder()
-                .id(role.getId())
-                .name(role.getName())
+//    public static GetRoleDTO fromEntity(Role role) {
+//        if (role == null) {
+//            return null;
+//        }
+//
+//        return GetRoleDTO.builder()
+//                .id(role.getId())
+//                .name(role.getName())
 //                .userRoles(role.getUserRoles() != null ?
 //                        role.getUserRoles().stream()
 //                                .map(UserRoleDTO::fromEntity)
 //                                .collect(Collectors.toSet()) : null)
-                .createdAt(role.getCreatedAt())
-                .updatedAt(role.getUpdatedAt())
-                .build();
-    }
+//                .createdAt(role.getCreatedAt())
+//                .updatedAt(role.getUpdatedAt())
+//                .build();
+//    }
 
     public static GetRoleDTOWithoutUserRoles fromEntityWithoutUserRoles(Role role) {
         if (role == null) {

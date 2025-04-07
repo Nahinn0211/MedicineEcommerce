@@ -4,9 +4,7 @@ import hunre.edu.vn.backend.dto.ServiceBookingDTO;
 import hunre.edu.vn.backend.entity.*;
 import hunre.edu.vn.backend.mapper.ServiceBookingMapper;
 import hunre.edu.vn.backend.repository.*;
-import hunre.edu.vn.backend.service.EmailService;
 import hunre.edu.vn.backend.service.ServiceBookingService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,9 +25,6 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
     private final AppointmentRepository appointmentRepository;
     private final DoctorProfileRepository doctorProfileRepository;
     private final ConsultationRepository consultationRepository;
-
-    @Autowired
-    private EmailService emailService;
 
     public ServiceBookingServiceImpl(
             ServiceBookingRepository serviceBookingRepository,
@@ -130,13 +125,6 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
             createRelatedRecords(serviceBooking, patientId, doctorId, appointmentDate, appointmentTime);
         }
 
-        try {
-            User user = serviceBooking.getPatient().getUser();
-            emailService.sendServiceBookingConfirmationEmail(user, serviceBooking);
-        } catch (Exception e) {
-            System.out.println("Lỗi khi gửi email xác nhận dịch vụ: " + e);
-        }
-
         return serviceBookingMapper.toGetServiceBookingDTO(serviceBooking);
     }
 
@@ -181,8 +169,8 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
     private ServiceBooking createOrUpdateServiceBooking(
             Long id,
             Long serviceId,
-            Long patientId,
             Long doctorId,
+            Long patientId,
             BigDecimal totalPrice,
             String paymentMethod,
             String status
@@ -237,28 +225,16 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
             LocalDate appointmentDate,
             LocalTime appointmentTime
     ) {
-        // Kiểm tra các tham số đầu vào
-        if (appointmentDate == null || appointmentTime == null) {
-            throw new IllegalArgumentException("Appointment date and time must not be null");
-        }
-
         // Create Appointment
         Appointment appointment = new Appointment();
-        appointment.setServiceBooking(savedBooking); // Liên kết ServiceBooking
+        appointment.setServiceBooking(savedBooking);
         appointment.setDoctor(doctorProfileRepository.findActiveById(doctorId)
                 .orElseThrow(() -> new RuntimeException("Doctor not found with ID: " + doctorId)));
         appointment.setPatient(patientRepository.findActiveById(patientId)
                 .orElseThrow(() -> new RuntimeException("Patient not found with ID: " + patientId)));
         appointment.setAppointmentDate(appointmentDate);
         appointment.setAppointmentTime(appointmentTime);
-        appointment.setCreatedAt(LocalDateTime.now());
-        appointment.setUpdatedAt(LocalDateTime.now());
-
         Appointment savedAppointment = appointmentRepository.save(appointment);
-
-        // Cập nhật ServiceBooking với Appointment
-        savedBooking.setAppointment(savedAppointment);
-        serviceBookingRepository.save(savedBooking);
 
         // Create Consultation
         Consultation consultation = new Consultation();
@@ -339,56 +315,13 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
     }
 
     private String generateUniqueConsultationCode() {
-        int maxAttempts = 10; // Giới hạn số lần thử
-        int attempts = 0;
-
-        while (attempts < maxAttempts) {
-            String code = UUID.randomUUID().toString().substring(0, 8)
+        String code;
+        do {
+            code = UUID.randomUUID().toString().substring(0, 8)
                     .replace("-", "")
                     .toUpperCase();
+        } while (consultationRepository.existsByConsultationCode(code));
 
-            try {
-                // Sử dụng Optional để xử lý an toàn hơn
-                boolean exists = Optional.ofNullable(consultationRepository.existsByConsultationCode(code))
-                        .orElse(false);
-
-                if (!exists) {
-                    return code;
-                }
-            } catch (Exception e) {
-                System.out.println("Lỗi khi kiểm tra mã tư vấn: {}" + e.getMessage());
-            }
-
-            attempts++;
-        }
-
-        // Nếu không thể tạo mã duy nhất sau nhiều lần thử
-        throw new RuntimeException("Không thể tạo mã tư vấn duy nhất sau " + maxAttempts + " lần thử");
+        return code;
     }
-
-    @Override
-    @Transactional
-    public String cancelServiceBooking(Long id) {
-        Optional<ServiceBooking> optionalBooking = serviceBookingRepository.findActiveById(id);
-
-        if (optionalBooking.isEmpty()) {
-            return "Không tìm thấy lịch đặt hợp lệ để hủy.";
-        }
-
-        ServiceBooking booking = optionalBooking.get();
-
-        // Đổi trạng thái
-        booking.setStatus(BookingStatus.CANCELLED);
-        serviceBookingRepository.save(booking);
-
-        // Hoàn tiền
-        PatientProfile patient = booking.getPatient();
-        patient.setAccountBalance(
-                patient.getAccountBalance().add(booking.getTotalPrice())
-        );
-        patientRepository.save(patient);
-
-        return "Đã hủy đặt lịch thành công và hoàn tiền.";
-    }
-
 }

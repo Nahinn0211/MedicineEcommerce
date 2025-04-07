@@ -6,11 +6,9 @@ import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -70,10 +68,6 @@ public class User extends BaseEntity {
     @Column(name = "reset_password_token", nullable = true)
     private String resetPasswordToken;
 
-    @Getter
-    @Column(name = "reset_password_expiry", nullable = true)
-    private LocalDateTime resetPasswordExpiry;
-
     @Builder.Default
     @ToString.Exclude
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -93,17 +87,9 @@ public class User extends BaseEntity {
     private DoctorProfile doctorProfile;
 
     public Set<Role> getRoles() {
-        if (userRoles == null) {
-            return Collections.emptySet();
-        }
-
-        Set<Role> roles = new HashSet<>();
-        for (UserRole userRole : userRoles) {
-            if (userRole.getRole() != null) {
-                roles.add(userRole.getRole());
-            }
-        }
-        return roles;
+        return userRoles.stream()
+                .map(UserRole::getRole)
+                .collect(Collectors.toSet());
     }
 
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -150,4 +136,5 @@ public class User extends BaseEntity {
     public void updateLastLogin() {
         this.lastLogin = LocalDateTime.now();
     }
+
 }

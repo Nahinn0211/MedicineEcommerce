@@ -1,9 +1,15 @@
 package hunre.edu.vn.backend.serviceImpl;
 
 import hunre.edu.vn.backend.dto.OrderDetailDTO;
-import hunre.edu.vn.backend.entity.*;
+import hunre.edu.vn.backend.entity.Attribute;
+import hunre.edu.vn.backend.entity.Medicine;
+import hunre.edu.vn.backend.entity.Order;
+import hunre.edu.vn.backend.entity.OrderDetail;
 import hunre.edu.vn.backend.mapper.OrderDetailMapper;
-import hunre.edu.vn.backend.repository.*;
+import hunre.edu.vn.backend.repository.AttributeRepository;
+import hunre.edu.vn.backend.repository.MedicineRepository;
+import hunre.edu.vn.backend.repository.OrderDetailRepository;
+import hunre.edu.vn.backend.repository.OrderRepository;
 import hunre.edu.vn.backend.service.OrderDetailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,20 +28,18 @@ public class OrderDetailServiceImpl implements OrderDetailService {
     private final MedicineRepository medicineRepository;
     private final OrderDetailMapper orderDetailMapper;
     private final AttributeRepository attributeRepository;
-    private final MedicineMediaRepository medicineMediaRepository;
 
     @Autowired
     public OrderDetailServiceImpl(
             OrderDetailRepository orderDetailRepository,
             OrderRepository orderRepository,
             MedicineRepository medicineRepository,
-            OrderDetailMapper orderDetailMapper, AttributeRepository attributeRepository, MedicineMediaRepository medicineMediaRepository) {
+            OrderDetailMapper orderDetailMapper, AttributeRepository attributeRepository) {
         this.orderDetailRepository = orderDetailRepository;
         this.orderRepository = orderRepository;
         this.medicineRepository = medicineRepository;
         this.orderDetailMapper = orderDetailMapper;
         this.attributeRepository = attributeRepository;
-        this.medicineMediaRepository = medicineMediaRepository;
     }
 
     @Override
@@ -48,8 +52,8 @@ public class OrderDetailServiceImpl implements OrderDetailService {
 
     @Override
     public Optional<OrderDetailDTO.GetOrderDetailDTO> findById(Long id) {
-        Optional<OrderDetail> orderDetail = orderDetailRepository.findActiveById(id);
-        return orderDetail.map(orderDetailMapper::toGetOrderDetailDTO);
+        return orderDetailRepository.findActiveById(id)
+                .map(orderDetailMapper::toGetOrderDetailDTO);
     }
 
     @Override
@@ -85,13 +89,11 @@ public class OrderDetailServiceImpl implements OrderDetailService {
         Attribute attribute = attributeRepository.findActiveById(orderDetailDTO.getAttributeId())
                 .orElseThrow(() -> new RuntimeException("Attribute not found with ID: " + orderDetailDTO.getAttributeId()));
         orderDetail.setAttribute(attribute);
-        int stock = attribute.getStock();
-        stock -= orderDetailDTO.getQuantity();
-        orderDetail.setQuantity(stock);
+
         // Cập nhật các trường khác
         orderDetail.setQuantity(orderDetailDTO.getQuantity());
         orderDetail.setUnitPrice(orderDetailDTO.getUnitPrice());
-        attributeRepository.save(attribute);
+        System.out.println(orderDetail);
         OrderDetail savedOrderDetail = orderDetailRepository.save(orderDetail);
         return orderDetailMapper.toGetOrderDetailDTO(savedOrderDetail);
     }

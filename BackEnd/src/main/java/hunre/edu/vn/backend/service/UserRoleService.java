@@ -6,10 +6,22 @@ import java.util.List;
 import java.util.Optional;
 
 public interface UserRoleService {
-    List<UserRoleDTO.GetUserRoleDTO> findAll();
+
+
+    UserRoleDTO.GetUserRoleDTO save(UserRoleDTO.SaveUserRoleDTO userRoleDTO);
+
+
     Optional<UserRoleDTO.GetUserRoleDTO> findById(Long id);
-    UserRoleDTO.GetUserRoleDTO saveOrUpdate(UserRoleDTO.SaveUserRoleDTO userRoleDTO);
-    String deleteByList(List<Long> ids);
+
     List<UserRoleDTO.GetUserRoleDTO> findByUserId(Long userId);
+
+    List<UserRoleDTO.GetUserRoleDTO> findAll();
+
     List<UserRoleDTO.GetUserRoleDTO> findByRoleId(Long roleId);
+
+
+    void deleteAllByUserId(Long userId);
+
+
+    void deleteById(Long id);
 }

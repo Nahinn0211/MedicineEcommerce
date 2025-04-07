@@ -36,6 +36,7 @@ public class DoctorProfileDTO {
         private Integer uniquePatientCount;
         private Integer totalConsultationCount;
         private Double averageRating;
+        private List<ServiceDTO.GetServiceDTO> services;
         private List<ReviewDTO.GetReviewDTO> reviews;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
@@ -89,6 +90,14 @@ public class DoctorProfileDTO {
                 .averageRating(doctorProfile.getAverageRating())
                 .build();
 
+        // Set services
+        if (doctorProfile.getDoctorServices() != null) {
+            dto.setServices(doctorProfile.getDoctorServices().stream()
+                    .filter(ds -> !ds.getIsDeleted())
+                    .map(ds -> ServiceDTO.fromEntity(ds.getService()))
+                    .toList());
+        }
+
         // Set reviews
         if (doctorProfile.getReviews() != null) {
             dto.setReviews(doctorProfile.getReviews().stream()
@@ -97,13 +106,6 @@ public class DoctorProfileDTO {
                     .toList());
         }
 
-        return dto;
-    }
-
-    public static GetDoctorProfileDTO fromEntityWithServices(DoctorProfile doctorProfile) {
-        if (doctorProfile == null) return null;
-
-        GetDoctorProfileDTO dto = fromEntity(doctorProfile);
         return dto;
     }
 }

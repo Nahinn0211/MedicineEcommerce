@@ -12,5 +12,7 @@ public interface UserMapper {
     @Mapping(target = "updatedAt", source = "updatedAt")
     UserDTO.GetUserDTO toGetUserDTO(User entity);
 
+
+
     User totoGetUserDtoEntity(UserDTO.SaveUserDTO dto);
 }

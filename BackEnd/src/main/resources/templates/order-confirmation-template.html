@@ -2,17 +2,14 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xác nhận đơn hàng</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-
         body {
-            font-family: 'Inter', Arial, sans-serif;
+            font-family: Arial, sans-serif;
             line-height: 1.6;
             margin: 0;
             padding: 0;
-            background-color: #f4f6f9;
+            background-color: #f6f6f6;
             color: #333;
         }
         .container {
@@ -20,164 +17,140 @@
             max-width: 600px;
             margin: 0 auto;
             background-color: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         .header {
-            background: linear-gradient(135deg, #4285f4 0%, #1a73e8 100%);
+            background-color: #4285f4;
             color: #ffffff;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 700;
+            border-radius: 6px 6px 0 0;
         }
         .content {
-            padding: 30px;
-        }
-        .order-info {
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-        }
-        .order-details {
-            background-color: #ffffff;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
+            padding: 20px;
         }
         table {
             width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-            margin-bottom: 20px;
+            border-collapse: collapse;
+            margin: 20px 0;
         }
         th, td {
-            padding: 12px;
+            border: 1px solid #ddd;
+            padding: 10px;
             text-align: left;
-            border-bottom: 1px solid #e9ecef;
         }
         th {
-            background-color: #f1f3f5;
-            font-weight: 600;
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .total {
+            font-weight: bold;
+            text-align: right;
+        }
+        .footer {
+            background-color: #f2f2f2;
+            padding: 15px;
+            text-align: center;
+            border-radius: 0 0 6px 6px;
+            font-size: 12px;
+            color: #666;
         }
         .status {
             display: inline-block;
             padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
+            border-radius: 3px;
+            font-weight: bold;
         }
         .status-pending {
-            background-color: #ffc107;
+            background-color: #ffca28;
             color: #856404;
         }
+        .status-confirmed {
+            background-color: #4caf50;
+            color: #155724;
+        }
+        .status-shipping {
+            background-color: #2196f3;
+            color: #004085;
+        }
         .status-completed {
-            background-color: #28a745;
-            color: white;
+            background-color: #4caf50;
+            color: #155724;
         }
         .status-cancelled {
-            background-color: #dc3545;
-            color: white;
-        }
-        .footer {
-            background-color: #f1f3f5;
-            padding: 15px;
-            text-align: center;
-            font-size: 12px;
-            color: #6c757d;
-        }
-        .total {
-            text-align: right;
-            font-weight: 700;
-            background-color: #f8f9fa;
-        }
-        @media only screen and (max-width: 600px) {
-            .container {
-                width: 100%;
-                border-radius: 0;
-            }
-            .content {
-                padding: 15px;
-            }
+            background-color: #f44336;
+            color: #721c24;
         }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
-        <h1>Xác Nhận Đơn Hàng</h1>
+        <h1>Xác nhận đơn hàng</h1>
     </div>
     <div class="content">
-        <p>Kính gửi <strong th:text="${name}">Khách hàng</strong>,</p>
+        <p>Kính gửi <b th:text="${name}">Khách hàng</b>,</p>
 
-        <div class="order-info">
-            <p><strong>Mã Đơn Hàng:</strong> <span th:text="${orderCode}">ORD1234</span></p>
-            <p><strong>Ngày Đặt Hàng:</strong> <span th:text="${orderDate}">01/01/2025</span></p>
-            <p>
-                <strong>Trạng Thái:</strong>
-                <span class="status" th:classappend="${'status-' + status.toLowerCase()}" th:text="${status}">Đang xử lý</span>
-            </p>
-            <p><strong>Phương Thức Thanh Toán:</strong> <span th:text="${paymentMethod}">Chuyển khoản</span></p>
-        </div>
+        <p>Cảm ơn bạn đã đặt hàng tại cửa hàng thuốc của chúng tôi. Đơn hàng của bạn đã được xác nhận và đang được xử lý.</p>
 
-        <div class="order-details">
-            <table>
-                <thead>
-                <tr>
-                    <th>Ảnh sản phẩm</th>
-                    <th>Sản Phẩm</th>
-                    <th>Đơn Giá</th>
-                    <th>Số Lượng</th>
-                    <th>Thành Tiền</th>
-                </tr>
-                </thead>
-                <tbody>
-                <!-- Kiểm tra nếu orderDetails rỗng hoặc null -->
-                <tr th:if="${orderDetails == null || orderDetails.isEmpty()}">
-                    <td colspan="4" style="text-align: center;">Không có dữ liệu sản phẩm</td>
-                </tr>
+        <h2>Thông tin đơn hàng</h2>
+        <p><strong>Mã đơn hàng:</strong> <span th:text="${orderCode}">ORD1234</span></p>
+        <p><strong>Ngày đặt hàng:</strong> <span th:text="${orderDate}">01/01/2025</span></p>
+        <p><strong>Trạng thái:</strong>
+            <span class="status" th:classappend="${'status-' + status.toLowerCase()}" th:text="${status}">Đang xử lý</span>
+        </p>
+        <p><strong>Phương thức thanh toán:</strong> <span th:text="${paymentMethod}">Chuyển khoản</span></p>
 
-                <!-- Hiển thị danh sách sản phẩm nếu có -->
-                <tr th:unless="${orderDetails == null || orderDetails.isEmpty()}"
-                    th:each="item : ${orderDetails}">
-                    <td>
-                        <img th:src="${orderDetailMainImages.get(item.id)}"
-                             alt="Product Image"
-                             style="width: 50px; height: 50px; object-fit: cover;">
-                    </td>
-                    <td th:text="${item.medicine.name}">Thuốc A</td>
-                    <td th:text="${#numbers.formatDecimal(item.unitPrice, 0, 'COMMA', 0, 'POINT')} + ' VNĐ'">100,000 VNĐ</td>
-                    <td th:text="${item.quantity}">2</td>
-                    <td th:text="${#numbers.formatDecimal(item.unitPrice * item.quantity, 0, 'COMMA', 0, 'POINT')} + ' VNĐ'">200,000 VNĐ</td>
-                </tr>
-                </tbody>
-                <tfoot>
-                <tr th:if="${discountAmount != null && discountAmount != '0 VNĐ'}">
-                    <td colspan="3" class="total">Giảm Giá:</td>
-                    <td th:text="${discountAmount}">0 VNĐ</td>
-                </tr>
-                <tr>
-                    <td colspan="3" class="total">Tổng Cộng:</td>
-                    <td th:text="${totalPrice}">200,000 VNĐ</td>
-                </tr>
-                </tfoot>
-            </table>
-        </div>
+        <h2>Chi tiết đơn hàng</h2>
+        <table>
+            <thead>
+            <tr>
+                <th>Sản phẩm</th>
+                <th>Thuộc tính</th>
+                <th>Đơn giá</th>
+                <th>Số lượng</th>
+                <th>Thành tiền</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${orderDetails}">
+                <td th:text="${item.medicine.name}">Thuốc A</td>
+                <td th:text="${item.attribute.name}">Loại 1</td>
+                <td th:text="${#numbers.formatDecimal(item.unitPrice, 0, 'COMMA', 0, 'POINT')} + ' VNĐ'">100,000 VNĐ</td>
+                <td th:text="${item.quantity}">2</td>
+                <td th:text="${#numbers.formatDecimal(item.unitPrice * item.quantity, 0, 'COMMA', 0, 'POINT')} + ' VNĐ'">200,000 VNĐ</td>
+            </tr>
+            </tbody>
+            <tfoot>
+            <tr th:if="${discountAmount != null && discountAmount != '0 VNĐ'}">
+                <td colspan="4" class="total">Giảm giá:</td>
+                <td th:text="${discountAmount}">0 VNĐ</td>
+            </tr>
+            <tr>
+                <td colspan="4" class="total">Tổng tiền:</td>
+                <td th:text="${totalPrice}">200,000 VNĐ</td>
+            </tr>
+            </tfoot>
+        </table>
 
         <div th:if="${note != null && note != ''}">
-            <h3>Ghi Chú</h3>
+            <h2>Ghi chú</h2>
             <p th:text="${note}">Ghi chú đặc biệt về đơn hàng</p>
         </div>
 
-        <p>Cảm ơn bạn đã mua hàng tại THAPV Pharmacity. Nếu có bất kỳ thắc mắc nào, vui lòng liên hệ với chúng tôi.</p>
+        <p>Nếu bạn có bất kỳ câu hỏi nào về đơn hàng của mình, vui lòng liên hệ với chúng tôi qua email hoặc số điện thoại của cửa hàng.</p>
+
+        <p>Trân trọng,<br>
+            <b>Đội ngũ hỗ trợ khách hàng</b></p>
     </div>
     <div class="footer">
-        <p>© 2025 THAPV Pharmacity. Bảo lưu mọi quyền.</p>
-        <p>Hotline: (028) 1234 5678 | Email: support@thapvpharmacity.com</p>
+        <p>© 2025 Cửa hàng thuốc. Tất cả quyền được bảo lưu.</p>
+        <p>Địa chỉ: 123 Đường ABC, Quận XYZ, TP.HCM</p>
+        <p>Email: support@pharmacy.com | Điện thoại: (028) 1234 5678</p>
     </div>
 </div>
 </body>

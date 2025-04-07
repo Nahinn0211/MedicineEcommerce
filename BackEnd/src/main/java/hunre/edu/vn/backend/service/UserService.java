@@ -48,7 +48,4 @@ public interface UserService {
 
     Long getDoctorProfileIdByUserId(Long userId);
     Long getPatientProfileIdByUserId(Long userId);
-    String generatePasswordResetToken(String email);
-    boolean validatePasswordResetToken(String token);
-    boolean resetPassword(String token, String newPassword);
 }

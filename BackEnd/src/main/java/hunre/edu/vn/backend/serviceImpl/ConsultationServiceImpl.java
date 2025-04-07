@@ -32,6 +32,7 @@ public class ConsultationServiceImpl implements ConsultationService {
     private final ChatMessageService chatMessageService;
     private final SimpMessagingTemplate messagingTemplate;
     private final ConsultationMapper consultationMapper;
+    private final String baseVideoCallUrl;
 
     @Override
     public List<ConsultationDTO.GetConsultationDTO> findAll() {
@@ -65,10 +66,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         } else {
             consultation = new Consultation();
             String consultationCode = generateUniqueConsultationCode();
-            String baseVideoCallUrl = "http://localhost:5173/consultation";
             String consultationLink = baseVideoCallUrl + "/" + consultationCode;
-            consultation.setConsultationCode(consultationCode);
-            consultation.setConsultationLink(consultationLink);
         }
 
         PatientProfile patient = patientRepository.findActiveById(dto.getPatientId())
@@ -86,6 +84,7 @@ public class ConsultationServiceImpl implements ConsultationService {
         consultation.setPatient(patient);
         consultation.setDoctor(doctor);
         consultation.setAppointment(appointment);
+        consultation.setConsultationLink(dto.getConsultationLink());
         consultation.setStatus(dto.getStatus());
 
         Consultation saved = consultationRepository.save(consultation);

@@ -44,12 +44,16 @@ public class WebSecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> {
                     authorize
+                             .requestMatchers("/api/vouchers/**").permitAll()
+                            .requestMatchers("/api/roles/**").permitAll()
+                            .requestMatchers("/api/user-roles/**").permitAll()
+                            .requestMatchers("/api/users/**").permitAll()
+
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/medicines/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/appointments/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/discounts/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/doctor-services/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/brands/**").permitAll()
-                            .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/users/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/services/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/categories/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/doctor-profiles/**").permitAll()
@@ -57,18 +61,16 @@ public class WebSecurityConfig {
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/medicine-media/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/attributes/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/reviews/**").permitAll()
-                            .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/vouchers/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/orders/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/order-details/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/service-bookings/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/profile/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/appointments/**").permitAll()
                             .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/patient-profiles/**").permitAll()
-                            .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/consultations/**").permitAll()
+                            .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/ws-consultation/**").permitAll()
+                            .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/roles/**").permitAll()
+
                             .requestMatchers("/api/auth/login").permitAll()
-                            .requestMatchers( "/ws-consultation/**").authenticated()
-                            .requestMatchers("/api/auth/forgot-password").permitAll()
-                            .requestMatchers("/api/auth/reset-password").permitAll()
                             .requestMatchers("/api/auth/register").permitAll()
                             .requestMatchers("/api/auth/login/facebook").permitAll()
                             .requestMatchers("/api/auth/login/google").permitAll()
@@ -76,7 +78,6 @@ public class WebSecurityConfig {
                             .requestMatchers("/swagger-ui/**").permitAll()
                             .requestMatchers("/swagger-resources/**").permitAll()
                             .requestMatchers("/webjars/**").permitAll()
-
                             .anyRequest().authenticated();
 
                     // Thêm log để debug

@@ -12,6 +12,5 @@ public interface RoleMapper {
     @Mapping(target = "createdAt", source = "createdAt")
     @Mapping(target = "updatedAt", source = "updatedAt")
     RoleDTO.GetRoleDTO toGetRoleDTO(Role entity);
-
     Role toRoleEntity(RoleDTO.SaveRoleDTO dto);
 }
